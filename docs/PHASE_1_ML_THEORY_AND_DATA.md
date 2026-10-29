@@ -2,31 +2,22 @@
 
 > **Duration:** 2 weeks · **10–15 hrs/week**
 > **Goal:** Understand *why* models work, not just how to run them. Build mathematical
-> intuition, master data work, and produce a GitHub-ready Jupyter notebook before
-> writing a single line of API code.
+> intuition, master data work, and train a baseline model whose checkpoint Phase 2 serves.
+>
+> **Code:** everything in this doc is the real code in [`ml-training/`](../ml-training/).
+> Each code block is headed with its file path. The code has been run, linted and tested
+> (`uv run pytest`: 15 tests).
 
 ---
 
 ## Table of Contents
 
 1. [What You Will Build](#1-what-you-will-build)
-2. [Folder Structure](#2-folder-structure)
+2. [Architecture and Folder Structure](#2-architecture-and-folder-structure)
 3. [Environment Setup](#3-environment-setup)
 4. [Week 1 — Math Intuition](#4-week-1--math-intuition)
-   - [4.1 How a Neural Network Learns (Concept Map)](#41-how-a-neural-network-learns-concept-map)
-   - [4.2 Linear Regression from Scratch](#42-linear-regression-from-scratch)
-   - [4.3 Gradient Descent Visualised](#43-gradient-descent-visualised)
-   - [4.4 Loss Functions — When to Use Which](#44-loss-functions--when-to-use-which)
-   - [4.5 What a CNN Actually Does](#45-what-a-cnn-actually-does)
 5. [Week 2 — Data Work](#5-week-2--data-work)
-   - [5.1 Download the PlantVillage Dataset](#51-download-the-plantvillage-dataset)
-   - [5.2 Exploratory Data Analysis (EDA)](#52-exploratory-data-analysis-eda)
-   - [5.3 Class Imbalance Detection](#53-class-imbalance-detection)
-   - [5.4 Image Preprocessing Pipeline](#54-image-preprocessing-pipeline)
-   - [5.5 Train / Validation / Test Splits](#55-train--validation--test-splits)
-   - [5.6 Baseline Model Training](#56-baseline-model-training)
-   - [5.7 Evaluation Reporter](#57-evaluation-reporter)
-6. [Portfolio Output — Jupyter Notebook](#6-portfolio-output--jupyter-notebook)
+6. [Training, Evaluation and Notebooks](#6-training-evaluation-and-notebooks)
 7. [Interview Questions & Model Answers](#7-interview-questions--model-answers)
 8. [Common Mistakes to Avoid](#8-common-mistakes-to-avoid)
 9. [Reference Links](#9-reference-links)
@@ -36,210 +27,207 @@
 
 ## 1. What You Will Build
 
-By the end of Phase 1 you will have **three committed artefacts** on GitHub:
-
-| Artefact | File | What it proves |
+| Artefact | Where | What it proves |
 |---|---|---|
-| Theory notebook | `notebooks/01_gradient_descent.ipynb` | You understand *why* training works |
-| EDA notebook | `notebooks/02_plantvillage_eda.ipynb` | You understand the data before modelling |
-| Training notebook | `notebooks/03_baseline_model.ipynb` | You can train, evaluate, and interpret a CNN |
+| Theory scripts + notebook | `src/crop_ml/theory/`, `notebooks/01_gradient_descent.ipynb` | You understand *why* training works |
+| EDA | `src/crop_ml/eda.py`, `notebooks/02_plantvillage_eda.ipynb` | You understand the data before modelling |
+| Baseline model | `src/crop_ml/train.py`, `notebooks/03_baseline_model.ipynb` | You can train, evaluate and interpret a CNN |
+| **Checkpoint for Phase 2** | `outputs/checkpoints/mobilenetv2_v1_best.pt` | The hand-off to the ML service |
 
-These are not toy exercises — they are the foundation every interview question in
-Phase 2 onwards will reference. When an interviewer asks *"walk me through your
-data pipeline"*, you point at this work.
+```mermaid
+flowchart LR
+    K[(Kaggle<br/>PlantVillage)] -->|kaggle CLI| D[data/PlantVillage/]
+    D --> E[eda.py<br/>plots + metadata.csv]
+    D --> S[data.py<br/>scan, split, loaders]
+    S --> T[train.py<br/>MobileNetV2]
+    T --> C[(mobilenetv2_v1_best.pt<br/>class_names.json)]
+    C --> V[evaluate.py<br/>report + confusion matrix]
+    C ==>|copy| P2[Phase 2<br/>python-ml-service]
+```
 
 ---
 
-## 2. Folder Structure
+## 2. Architecture and Folder Structure
+
+The code is a small **installable package** (`crop_ml`) with one module per concern.
+Notebooks only *call* the package, so nothing important lives only inside a notebook,
+and every step can also run from the terminal.
 
 ```
-ml-foundations/              ← project root
-│
-├── notebooks/               ← Jupyter notebooks (one per concern)
-│   ├── 01_gradient_descent.ipynb
-│   ├── 02_plantvillage_eda.ipynb
-│   └── 03_baseline_model.ipynb
-│
-├── src/                     ← reusable Python modules (not notebook-only code)
-│   ├── __init__.py
-│   ├── dataset.py           ← dataset loading and splitting
-│   ├── transforms.py        ← image preprocessing pipeline
-│   ├── train.py             ← training loop
-│   └── evaluate.py          ← metrics and confusion matrix
-│
-├── data/                    ← raw data (gitignored)
-│   └── plantvillage/        ← extracted dataset lives here
-│
-├── outputs/                 ← saved plots, model checkpoints (gitignored)
-│   ├── plots/
-│   └── checkpoints/
-│
-├── requirements.txt         ← pinned dependencies
-├── .gitignore
-└── README.md
+ml-training/
+├── pyproject.toml          ← dependencies + ruff/pytest/mypy config (uv project)
+├── uv.lock                 ← exact versions of every package (commit this)
+├── src/crop_ml/
+│   ├── config.py           ← TrainConfig: every setting in one dataclass
+│   ├── data.py             ← scan images, parse class names, stratified split, loaders, sampler
+│   ├── transforms.py       ← train (augmenting) and eval (deterministic) pipelines
+│   ├── model.py            ← MobileNetV2 with a new classification head
+│   ├── train.py            ← CLI: training loop, early stopping, checkpoint
+│   ├── evaluate.py         ← CLI: classification report, confusion matrix, summary JSON
+│   ├── eda.py              ← CLI: class distribution, image sizes, sample grid
+│   └── theory/             ← week 1: gradient_descent, lr_experiment, loss_functions
+├── notebooks/              ← 01_gradient_descent, 02_plantvillage_eda, 03_baseline_model
+├── tests/                  ← pytest on a tiny synthetic dataset (no download needed)
+├── data/                   ← dataset (gitignored)
+└── outputs/                ← plots, checkpoints, splits.json (gitignored)
 ```
 
-Create the scaffold now:
-
-```bash
-# Create the project root
-mkdir ml-foundations && cd ml-foundations
-
-# Create all directories in one command
-mkdir -p notebooks src data/plantvillage outputs/plots outputs/checkpoints
-
-# Create empty Python module files
-touch src/__init__.py src/dataset.py src/transforms.py src/train.py src/evaluate.py
-
-# Create .gitignore — data and model weights are too large for GitHub
-cat > .gitignore << 'EOF'
-# Data — download locally, never commit
-data/
-
-# Model checkpoints — large binary files
-outputs/checkpoints/
-
-# Python environment
-.venv/
-__pycache__/
-*.pyc
-*.pyo
-.ipynb_checkpoints/
-
-# uv lockfile artefacts
-.python-version
-EOF
-
-echo "Scaffold created successfully"
+```mermaid
+flowchart TB
+    cfg[config.py<br/>TrainConfig] --> data & train
+    tf[transforms.py] --> data
+    data[data.py] --> train[train.py]
+    model[model.py] --> train
+    model --> evaluate[evaluate.py]
+    data --> evaluate
+    data --> eda[eda.py]
+    train -->|splits.json + checkpoint| evaluate
 ```
 
 ---
 
 ## 3. Environment Setup
 
-### 3.1 Install Python and uv
+### 3.1 Tools (once per machine)
 
 ```bash
-# Install pyenv — version manager (never use system Python for ML projects)
-brew install pyenv
+# Homebrew package manager (skip if `brew --version` already works)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Add pyenv to your shell — append to ~/.zshrc
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
-echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
-echo 'eval "$(pyenv init -)"' >> ~/.zshrc
-
-# Reload shell
-source ~/.zshrc
-
-# Install Python 3.11 — stable, well-supported by PyTorch and TF
-pyenv install 3.11.9
-pyenv local 3.11.9   # pins this version to the project folder only
-
-# Verify — should show 3.11.9
-python --version
-
-# Install uv — fast package manager (replaces pip)
+# uv: installs Python itself and manages every project's packages
 brew install uv
-
-# Verify
-uv --version
+uv python install 3.11
 ```
 
-### 3.2 Create virtual environment and install dependencies
+> You do **not** need pyenv: `uv python install` manages Python versions, and the
+> `.python-version` file in the project pins 3.11.
+
+### 3.2 Create the project and install dependencies
+
+The repo already contains `ml-training/`, so you only run `uv sync`. To recreate it from
+scratch, these are the commands that built it:
 
 ```bash
-# Still inside ml-foundations/
+uv init --package --python 3.11 --name crop-ml ml-training
+cd ml-training
 
-# Create virtual environment in .venv/
-uv venv
+# Runtime dependencies (comments go on their own lines; a comment after "\" breaks the command)
+uv add numpy pandas matplotlib seaborn scikit-learn torch torchvision pillow tqdm
 
-# Activate it — you must do this every time you open a new terminal
-source .venv/bin/activate
-
-# Your prompt should now show (.venv)
-# Install the full ML stack
-uv add \
-  numpy \               # array math — the foundation of everything
-  pandas \              # dataframes for EDA
-  matplotlib \          # plotting
-  seaborn \             # statistical plots (confusion matrix heatmaps)
-  scikit-learn \        # classical ML, metrics, train/test split
-  torch \               # PyTorch — deep learning framework
-  torchvision \         # image datasets, transforms, pretrained models
-  pillow \              # image loading (PIL)
-  jupyter \             # notebook server
-  ipykernel \           # connects Jupyter to our .venv kernel
-  tqdm                  # progress bars for training loops
-
-# Dev-only tools
-uv add --dev \
-  ruff \                # linter + formatter (replaces flake8 + black)
-  mypy                  # type checker
-
-# Pin exact versions for reproducibility
-uv pip freeze > requirements.txt
-
-echo "Environment ready — $(python --version)"
+# Dev-only tools: tests, lint, notebooks, dataset download
+uv add --dev pytest ruff mypy ipykernel jupyter kaggle
 ```
 
-### 3.3 Register the kernel with Jupyter
+Day to day:
 
 ```bash
-# This makes Jupyter see our .venv instead of the system Python
-python -m ipykernel install --user --name ml-foundations --display-name "ML Foundations (3.11)"
-
-# Launch Jupyter — it opens in your browser
-jupyter notebook
-
-# You should see the kernel "ML Foundations (3.11)" available when creating a new notebook
+cd ml-training
+uv sync                 # create/update .venv exactly as uv.lock says
+uv run pytest           # 15 tests, ~30 s, no dataset needed
+uv run ruff check .     # lint
 ```
 
-### 3.4 Install Kaggle CLI (needed for dataset download in Week 2)
+> `uv run <cmd>` runs inside the project's `.venv`, so you never have to `source activate`.
+> `uv.lock` pins every version; commit it. No `requirements.txt` is needed.
+
+**File:** `ml-training/pyproject.toml`
+
+```toml
+[project]
+name = "crop-ml"
+version = "0.1.0"
+description = "Phase 1: PlantVillage data pipeline and MobileNetV2 baseline for crop disease classification"
+readme = "README.md"
+authors = [
+    { name = "Paul Mburu", email = "paulmburu53@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.4.6",
+    "pandas>=3.1.0",
+    "pillow>=13.0.0",
+    "scikit-learn>=1.9.1",
+    "seaborn>=0.13.2",
+    "torch>=2.15.0",
+    "torchvision>=0.29.2",
+    "tqdm>=4.70.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "jupyter>=1.1.1",
+    "kaggle>=2.2.5",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+per-file-ignores = { "notebooks/*" = ["E402", "E701", "E702"] }  # notebooks favour short exploratory lines
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+```
+
+### 3.3 Register the Jupyter kernel
 
 ```bash
-# Install kaggle CLI
-uv add kaggle
-
-# Create API token directory
-mkdir -p ~/.kaggle
-
-# Go to https://www.kaggle.com/settings → Account → API → Create New Token
-# It downloads kaggle.json — move it to the right place
-mv ~/Downloads/kaggle.json ~/.kaggle/kaggle.json
-
-# Restrict permissions — kaggle CLI requires this
-chmod 600 ~/.kaggle/kaggle.json
-
-# Verify — should print your username
-kaggle config view
+uv run python -m ipykernel install --user --name crop-ml --display-name "crop-ml (ml-training)"
+uv run jupyter lab        # pick the "crop-ml" kernel in each notebook
 ```
+
+### 3.4 Kaggle login (needed in Week 2)
+
+1. Create a free account at kaggle.com and verify your email.
+2. Log the CLI in through your browser (no file to copy, nothing to paste):
+
+```bash
+cd ml-training
+uv run kaggle auth login                                 # opens a browser; approve access
+uv run kaggle datasets list -s plantdisease | head -3   # a list = login works
+```
+
+If the browser flow is not possible, Kaggle's settings page (kaggle.com/settings/api) offers
+**Generate New Token** (save it to `~/.kaggle/access_token`) or the older **Create Legacy API Key**
+(`~/.kaggle/kaggle.json`); then `chmod 600` the file. Treat either one as a password.
 
 ---
 
 ## 4. Week 1 — Math Intuition
 
-> **Week 1 goal:** Implement gradient descent by hand so you understand it
-> mechanically, not just conceptually. Interviewers will ask you to explain it
-> on a whiteboard. This week is your preparation for that.
+> **Week 1 goal:** implement gradient descent by hand so you understand it mechanically.
+> Interviewers will ask you to explain it on a whiteboard.
 
 ### 4.1 How a Neural Network Learns (Concept Map)
 
 ```mermaid
 flowchart LR
-    A[Input image\n224×224 px] --> B[Forward pass\npredict output]
-    B --> C[Loss function\nmeasure error]
-    C --> D[Backpropagation\ncalculate gradients]
-    D --> E[Optimiser\nupdate weights]
-    E --> B
-    C --> F{Loss low\nenough?}
-    F -- No --> D
-    F -- Yes --> G[Trained model]
+    A[Batch of images<br/>224×224 px] --> B[Forward pass<br/>predict]
+    B --> C[Loss function<br/>measure error]
+    C --> D[Backpropagation<br/>compute gradients]
+    D --> E[Optimiser<br/>update weights]
+    E --> F{More batches /<br/>epochs left?}
+    F -- Yes --> A
+    F -- No --> G[Trained model]
 ```
 
-The loop above runs for every **batch** of images, hundreds of thousands of
-times. Understanding each box is what Week 1 builds.
-
-**Key vocabulary you must be able to define without notes:**
+One trip round this loop is one **step**; one pass over every training image is one **epoch**.
 
 | Term | One-sentence definition |
 |---|---|
@@ -247,1407 +235,1814 @@ times. Understanding each box is what Week 1 builds.
 | Bias | An offset weight that lets the model shift its output |
 | Forward pass | Running input through the model to produce a prediction |
 | Loss | A number measuring how wrong the prediction was |
-| Gradient | The direction and magnitude to move each weight to reduce loss |
-| Backpropagation | Algorithm that calculates gradients by working backwards through layers |
+| Gradient | The direction and size to move each weight to reduce the loss |
+| Backpropagation | Computing gradients by working backwards through the layers (chain rule) |
 | Learning rate | How large a step the optimiser takes when updating weights |
-| Epoch | One full pass through the entire training dataset |
-| Batch | A subset of training data processed before a weight update |
-| Overfitting | Model memorises training data but fails on new data |
-
----
+| Epoch | One full pass through the training dataset |
+| Batch | A subset of training data processed before one weight update |
+| Overfitting | The model memorises training data but fails on new data |
 
 ### 4.2 Linear Regression from Scratch
 
-**File:** `src/gradient_descent.py`
+Fit `y = w·x + b` with nothing but numpy, so every moving part is visible.
 
-Implement this before using PyTorch. The point is to see every moving part
-manually before a framework hides it.
+**File:** `ml-training/src/crop_ml/theory/gradient_descent.py`
 
 ```python
-# src/gradient_descent.py
-#
-# Linear regression using gradient descent — implemented from scratch.
-# This is the simplest possible example of supervised learning.
-# Goal: find the line y = w*x + b that best fits the data.
+"""Linear regression trained with hand-written gradient descent.
 
-import numpy as np
-import matplotlib.pyplot as plt
+Week 1 theory exercise: every moving part of training (forward pass, loss,
+gradients, update) is visible before PyTorch hides it.
+
+Run:  uv run python -m crop_ml.theory.gradient_descent
+Out:  outputs/plots/gradient_descent.png
+"""
+
 from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")  # write PNGs without needing a GUI window
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+
+PLOTS_DIR = Path("outputs/plots")
 
 
 def generate_data(n: int = 100, seed: int = 42) -> tuple[np.ndarray, np.ndarray]:
+    """Return X, y with a known relationship y = 3x + 2 plus noise.
+
+    Knowing the true answer (w=3, b=2) lets us check that training works.
     """
-    Generate synthetic data with a known linear relationship plus noise.
-    We know the true answer (w=3, b=2) so we can verify our model learns it.
-    """
-    np.random.seed(seed)
-    X = np.random.randn(n)           # input features — random numbers
-    noise = np.random.randn(n) * 0.5 # real data is never perfectly clean
-    y = 3 * X + 2 + noise            # true relationship: y = 3x + 2
+    rng = np.random.default_rng(seed)
+    X = rng.standard_normal(n)
+    y = 3 * X + 2 + rng.standard_normal(n) * 0.5
     return X, y
 
 
 def forward(X: np.ndarray, w: float, b: float) -> np.ndarray:
-    """
-    Forward pass: apply the current model parameters to produce predictions.
-    This is just the equation of a line.
-    """
+    """Forward pass: the model is just a line."""
     return w * X + b
 
 
 def mse_loss(y_pred: np.ndarray, y_true: np.ndarray) -> float:
-    """
-    Mean Squared Error loss.
-    Squaring does two things:
-      1. Makes all errors positive (no cancellation between over and under predictions)
-      2. Penalises large errors more heavily than small ones
-    """
+    """Mean squared error. Squaring removes signs and punishes big misses."""
     return float(np.mean((y_pred - y_true) ** 2))
 
 
 def compute_gradients(
     X: np.ndarray, y_pred: np.ndarray, y_true: np.ndarray
 ) -> tuple[float, float]:
-    """
-    Compute partial derivatives of MSE loss with respect to w and b.
+    """Partial derivatives of MSE with respect to w and b (chain rule).
 
-    These tell us: if we increase w by a tiny amount, how much does the loss change?
-    A positive gradient means "increasing this parameter increases the loss" →
-    we should decrease the parameter. That is the core idea of gradient descent.
-
-    Derivation (for reference):
-      Loss = mean((y_pred - y_true)^2) = mean((w*X + b - y_true)^2)
-      dL/dw = 2 * mean(X * (y_pred - y_true))   ← chain rule
-      dL/db = 2 * mean(y_pred - y_true)
+    dL/dw = 2 * mean(X * error)      dL/db = 2 * mean(error)
     """
-    n = len(X)
-    error = y_pred - y_true                   # residuals
-    dw = 2 * np.mean(X * error)               # gradient w.r.t. weight
-    db = 2 * np.mean(error)                   # gradient w.r.t. bias
-    return dw, db
+    error = y_pred - y_true
+    return float(2 * np.mean(X * error)), float(2 * np.mean(error))
 
 
 def train(
-    X: np.ndarray,
-    y: np.ndarray,
-    lr: float = 0.01,    # learning rate — step size for each update
-    epochs: int = 200,   # how many full passes through the data
+    X: np.ndarray, y: np.ndarray, lr: float = 0.05, epochs: int = 200, verbose: bool = True
 ) -> tuple[float, float, list[float]]:
-    """
-    Full gradient descent training loop.
-    Returns the learned weight, bias, and loss history for plotting.
-    """
-    w, b = 0.0, 0.0   # initialise parameters at zero (or random — both work here)
-    losses = []
-
+    """Run full-batch gradient descent. Returns (w, b, loss history)."""
+    w, b = 0.0, 0.0
+    losses: list[float] = []
     for epoch in range(epochs):
-        # 1. Forward pass — predict with current parameters
-        y_pred = forward(X, w, b)
-
-        # 2. Compute loss — how wrong are we?
-        loss = mse_loss(y_pred, y)
+        y_pred = forward(X, w, b)  # 1. predict
+        loss = mse_loss(y_pred, y)  # 2. measure error
         losses.append(loss)
-
-        # 3. Compute gradients — which direction reduces loss?
-        dw, db = compute_gradients(X, y_pred, y)
-
-        # 4. Update parameters — move opposite to the gradient (descent)
-        #    Small lr → slow but stable convergence
-        #    Large lr → fast but may overshoot or diverge
-        w -= lr * dw
+        dw, db = compute_gradients(X, y_pred, y)  # 3. which way is downhill?
+        w -= lr * dw  # 4. step downhill
         b -= lr * db
-
-        if epoch % 20 == 0:
+        if verbose and epoch % 20 == 0:
             print(f"Epoch {epoch:3d} | Loss: {loss:.4f} | w={w:.3f} b={b:.3f}")
-
     return w, b, losses
 
 
 def plot_results(
-    X: np.ndarray,
-    y: np.ndarray,
-    w: float,
-    b: float,
-    losses: list[float],
-    save_dir: str = "outputs/plots",
-) -> None:
-    """
-    Save two plots: the fitted line and the loss convergence curve.
-    Always save plots — they go in the notebook and README.
-    """
-    Path(save_dir).mkdir(parents=True, exist_ok=True)
-
+    X: np.ndarray, y: np.ndarray, w: float, b: float, losses: list[float], save_dir: Path = PLOTS_DIR
+) -> Path:
+    """Save the fitted line and the loss curve side by side. Returns the file path."""
+    save_dir.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
-    # Left: fitted line over scatter plot
     axes[0].scatter(X, y, alpha=0.5, label="Data", color="steelblue")
     x_line = np.linspace(X.min(), X.max(), 100)
     axes[0].plot(x_line, w * x_line + b, color="tomato", lw=2, label=f"Fit: y={w:.2f}x+{b:.2f}")
-    axes[0].set_title("Fitted Line")
-    axes[0].set_xlabel("X")
-    axes[0].set_ylabel("y")
+    axes[0].set(title="Fitted line", xlabel="X", ylabel="y")
     axes[0].legend()
 
-    # Right: loss over epochs — shows convergence
     axes[1].plot(losses, color="steelblue")
-    axes[1].set_title("Loss Convergence")
-    axes[1].set_xlabel("Epoch")
-    axes[1].set_ylabel("MSE Loss")
-    axes[1].set_yscale("log")   # log scale reveals early rapid improvement
+    axes[1].set(title="Loss convergence", xlabel="Epoch", ylabel="MSE (log scale)", yscale="log")
 
-    plt.tight_layout()
-    path = Path(save_dir) / "gradient_descent.png"
-    plt.savefig(path, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"Saved plot → {path}")
+    path = save_dir / "gradient_descent.png"
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
 
 
 if __name__ == "__main__":
     X, y = generate_data()
-    w, b, losses = train(X, y, lr=0.05, epochs=200)
-    print(f"\nLearned: w={w:.3f}, b={b:.3f}  (True: w=3.0, b=2.0)")
-    plot_results(X, y, w, b, losses)
+    w, b, losses = train(X, y)
+    print(f"\nLearned: w={w:.3f}, b={b:.3f}  (true: w=3.0, b=2.0)")
+    print(f"Saved plot -> {plot_results(X, y, w, b, losses)}")
 ```
 
-Run it:
+**Run it:**
 
 ```bash
-# Run from the project root with the venv active
-python src/gradient_descent.py
-
-# Expected output (approximately):
-# Epoch   0 | Loss: 13.2341 | w=0.421 b=0.089
-# Epoch  20 | Loss: 1.0432  | w=2.611 b=1.743
-# ...
-# Epoch 180 | Loss: 0.2518  | w=2.987 b=1.998
-#
-# Learned: w=2.987, b=1.998  (True: w=3.0, b=2.0)
-# Saved plot → outputs/plots/gradient_descent.png
+uv run python -m crop_ml.theory.gradient_descent
 ```
 
----
+**Expected output** (exact, the data is seeded):
 
-### 4.3 Gradient Descent Visualised
+```
+Epoch   0 | Loss: 9.2256 | w=0.173 b=0.184
+Epoch  20 | Loss: 0.8257 | w=2.180 b=1.714
+...
+Epoch 180 | Loss: 0.2353 | w=3.060 b=1.998
 
-The loss landscape concept — understanding why learning rate matters:
+Learned: w=3.060, b=1.998  (true: w=3.0, b=2.0)
+Saved plot -> outputs/plots/gradient_descent.png
+```
+
+The learned values are close to, not exactly, 3 and 2: the noise in the data makes the
+best-fitting line differ slightly from the true one. That is expected.
+
+### 4.3 Learning Rate: Too Small, Good, Too Large
 
 ```mermaid
-graph TD
-    A["Loss landscape (bowl shape)"] --> B["Large learning rate\n→ overshoots minimum\n→ diverges or oscillates"]
-    A --> C["Good learning rate\n→ converges smoothly\n→ reaches minimum"]
-    A --> D["Too small learning rate\n→ takes thousands of steps\n→ wastes compute"]
+flowchart TD
+    A["Loss landscape<br/>(a bowl for MSE)"] --> B["Too large lr<br/>each step overshoots further<br/>→ diverges"]
+    A --> C["Good lr<br/>steady steps downhill<br/>→ converges"]
+    A --> D["Too small lr<br/>tiny steps<br/>→ needs thousands of epochs"]
 ```
 
-**Learning rate intuition** — the single most important hyperparameter to
-understand for interviews:
+**Why does 0.5 still work here?** For MSE on this data the loss bowl has curvature ≈ 2,
+and plain gradient descent stays stable while `lr < 2 / curvature ≈ 1.0`. So 0.5 converges
+(very fast), and you need `lr > 1` to see divergence. The experiment includes both.
+
+**File:** `ml-training/src/crop_ml/theory/lr_experiment.py`
 
 ```python
-# src/lr_experiment.py
-#
-# Run gradient descent with three different learning rates.
-# Visualise how lr affects convergence speed and stability.
-# This produces a plot you can reference in interviews.
+"""How the learning rate changes convergence: too small, good, near the edge, too large.
 
-import numpy as np
-import matplotlib.pyplot as plt
-from gradient_descent import generate_data, forward, mse_loss, compute_gradients
+For this data (X ~ N(0, 1)) the MSE curvature is about 2, so plain gradient
+descent is stable only while lr < ~1.0. lr=0.5 converges in very few steps;
+lr=1.05 overshoots further on every step and diverges.
+
+Run:  uv run python -m crop_ml.theory.lr_experiment
+Out:  outputs/plots/learning_rate_comparison.png
+"""
+
 from pathlib import Path
 
+import matplotlib
 
-def run_experiment(lr: float, epochs: int = 100) -> list[float]:
-    """Train with a fixed learning rate and return loss history."""
-    X, y = generate_data()
-    w, b = 0.0, 0.0
-    losses = []
-    for _ in range(epochs):
-        y_pred = forward(X, w, b)
-        losses.append(mse_loss(y_pred, y))
-        dw, db = compute_gradients(X, y_pred, y)
-        w -= lr * dw
-        b -= lr * db
-    return losses
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
 
+from crop_ml.theory.gradient_descent import PLOTS_DIR, generate_data, train  # noqa: E402
 
-# Three scenarios that will appear in every ML interview conversation
-experiments = {
+EXPERIMENTS = {
     "lr=0.001 (too small)": 0.001,
-    "lr=0.05 (good)":       0.05,
-    "lr=0.5 (too large)":   0.5,
+    "lr=0.05 (good)": 0.05,
+    "lr=0.5 (fast, still stable)": 0.5,
+    "lr=1.05 (too large: diverges)": 1.05,
 }
 
-plt.figure(figsize=(10, 4))
-for label, lr in experiments.items():
-    losses = run_experiment(lr)
-    # Clip to 50 so diverging experiments don't crush the scale
-    clipped = [min(l, 50) for l in losses]
-    plt.plot(clipped, label=label)
 
-plt.xlabel("Epoch")
-plt.ylabel("MSE Loss (clipped at 50)")
-plt.title("Effect of Learning Rate on Convergence")
-plt.legend()
-plt.yscale("log")
+def run_all(epochs: int = 60) -> dict[str, list[float]]:
+    """Train once per learning rate and return each loss history."""
+    X, y = generate_data()
+    return {label: train(X, y, lr=lr, epochs=epochs, verbose=False)[2] for label, lr in EXPERIMENTS.items()}
 
-Path("outputs/plots").mkdir(parents=True, exist_ok=True)
-plt.savefig("outputs/plots/learning_rate_comparison.png", dpi=150, bbox_inches="tight")
-plt.close()
-print("Saved → outputs/plots/learning_rate_comparison.png")
+
+def plot(histories: dict[str, list[float]], save_dir: Path = PLOTS_DIR) -> Path:
+    """Plot every history on one log-scale chart (clipped so divergence stays readable)."""
+    save_dir.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(10, 4))
+    for label, losses in histories.items():
+        ax.plot([min(v, 1e3) for v in losses], label=label)
+    ax.set(xlabel="Epoch", ylabel="MSE (clipped at 1000, log)", yscale="log",
+           title="Effect of learning rate on convergence")
+    ax.legend()
+    path = save_dir / "learning_rate_comparison.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+if __name__ == "__main__":
+    histories = run_all()
+    for label, losses in histories.items():
+        print(f"{label:32s} final loss = {losses[-1]:.4g}")
+    print(f"Saved -> {plot(histories)}")
 ```
 
----
+**Run it:**
+
+```bash
+uv run python -m crop_ml.theory.lr_experiment
+```
+
+**Expected output:**
+
+```
+lr=0.001 (too small)             final loss = 7.84
+lr=0.05 (good)                   final loss = 0.24
+lr=0.5 (fast, still stable)      final loss = 0.2353
+lr=1.05 (too large: diverges)    final loss = 8.012e+05
+Saved -> outputs/plots/learning_rate_comparison.png
+```
 
 ### 4.4 Loss Functions — When to Use Which
 
-**File:** `src/loss_functions.py`
+**File:** `ml-training/src/crop_ml/theory/loss_functions.py`
 
 ```python
-# src/loss_functions.py
-#
-# Demonstrate the three loss functions you will encounter most often.
-# Each one is implemented manually first so the formula is clear,
-# then shown against its numpy/PyTorch equivalent.
+"""The four losses you meet most often, written by hand and checked against PyTorch.
+
+- MSE: regression, punishes large errors hard.
+- MAE: regression, robust to outliers.
+- Cross-entropy: pick 1 of N classes (our crop disease task).
+- Binary cross-entropy: yes/no, or several independent yes/no labels.
+
+Run:  uv run python -m crop_ml.theory.loss_functions
+"""
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 
-# ─────────────────────────────────────────────
-# 1. Mean Squared Error (MSE)
-# ─────────────────────────────────────────────
-# Use for: REGRESSION tasks (predicting a continuous value)
-# Property: heavily penalises large errors — squaring magnifies them
-# Weakness: sensitive to outliers — one bad prediction can dominate
-# ─────────────────────────────────────────────
 def mse(y_pred: np.ndarray, y_true: np.ndarray) -> float:
     return float(np.mean((y_pred - y_true) ** 2))
 
-y_pred = np.array([2.5, 0.0, 2.0, 8.0])
-y_true = np.array([3.0, -0.5, 2.0, 7.0])
-print(f"MSE (manual):  {mse(y_pred, y_true):.4f}")
-print(f"MSE (PyTorch): {nn.MSELoss()(torch.tensor(y_pred, dtype=torch.float32), torch.tensor(y_true, dtype=torch.float32)):.4f}")
 
-
-# ─────────────────────────────────────────────
-# 2. Mean Absolute Error (MAE)
-# ─────────────────────────────────────────────
-# Use for: REGRESSION where outliers should not dominate
-# Property: treats all errors equally regardless of size
-# Example: predicting house prices where a few mansions skew the data
-# ─────────────────────────────────────────────
 def mae(y_pred: np.ndarray, y_true: np.ndarray) -> float:
     return float(np.mean(np.abs(y_pred - y_true)))
 
-print(f"\nMAE (manual):  {mae(y_pred, y_true):.4f}")
-print(f"MAE (PyTorch): {nn.L1Loss()(torch.tensor(y_pred, dtype=torch.float32), torch.tensor(y_true, dtype=torch.float32)):.4f}")
 
-
-# ─────────────────────────────────────────────
-# 3. Cross-Entropy Loss
-# ─────────────────────────────────────────────
-# Use for: CLASSIFICATION tasks (predicting a class label)
-# How it works: penalises confident wrong predictions very harshly
-#   - Predicted 99% probability for the WRONG class → huge loss
-#   - Predicted 51% probability for the WRONG class → smaller loss
-# Formula: -sum(y_true * log(y_pred))
-# ─────────────────────────────────────────────
 def cross_entropy(logits: np.ndarray, true_class: int) -> float:
-    """
-    logits: raw model outputs BEFORE softmax (one value per class)
-    true_class: index of the correct class
-    """
-    # Softmax converts raw logits to probabilities that sum to 1
-    exp = np.exp(logits - logits.max())   # subtract max for numerical stability
+    """Softmax the raw scores, then take -log(probability of the correct class)."""
+    exp = np.exp(logits - logits.max())  # subtracting the max avoids overflow
     probs = exp / exp.sum()
-    # Cross-entropy: negative log of the probability assigned to the correct class
-    return float(-np.log(probs[true_class] + 1e-9))  # 1e-9 avoids log(0)
-
-# Example: 3-class problem (Healthy, Early Blight, Late Blight)
-logits = np.array([2.0, 1.0, 0.1])  # model output — highest score for class 0
-true_class = 0                        # correct answer is class 0 (Healthy)
-print(f"\nCross-entropy (manual): {cross_entropy(logits, true_class):.4f}")
-# PyTorch equivalent:
-criterion = nn.CrossEntropyLoss()
-print(f"Cross-entropy (PyTorch): {criterion(torch.tensor([logits], dtype=torch.float32), torch.tensor([true_class])):.4f}")
+    return float(-np.log(probs[true_class]))
 
 
-# ─────────────────────────────────────────────
-# When to use which — quick reference
-# ─────────────────────────────────────────────
-print("""
-Loss Function Decision Guide
-─────────────────────────────
-Task                          Loss to use
-─────────────────────────────────────────
-Predict a number              MSE (default) or MAE (outliers)
-Predict yes/no (binary)       Binary Cross-Entropy (BCELoss)
-Predict 1 of N classes        Cross-Entropy (CrossEntropyLoss)
-Predict multiple labels       Binary Cross-Entropy per label
-""")
+def binary_cross_entropy(logit: float, label: int) -> float:
+    """Sigmoid the raw score, then -[y*log(p) + (1-y)*log(1-p)]."""
+    p = 1.0 / (1.0 + np.exp(-logit))
+    return float(-(label * np.log(p) + (1 - label) * np.log(1 - p)))
+
+
+def _t(a: np.ndarray) -> torch.Tensor:
+    return torch.from_numpy(np.asarray(a, dtype=np.float32))
+
+
+def main() -> None:
+    y_pred = np.array([2.5, 0.0, 2.0, 8.0])
+    y_true = np.array([3.0, -0.5, 2.0, 7.0])
+    print(f"MSE  manual={mse(y_pred, y_true):.4f}  torch={nn.MSELoss()(_t(y_pred), _t(y_true)):.4f}")
+    print(f"MAE  manual={mae(y_pred, y_true):.4f}  torch={nn.L1Loss()(_t(y_pred), _t(y_true)):.4f}")
+
+    # 3 classes (Healthy, Early blight, Late blight); the model favours class 0.
+    logits = np.array([2.0, 1.0, 0.1])
+    torch_ce = nn.CrossEntropyLoss()(_t(logits).unsqueeze(0), torch.tensor([0]))
+    print(f"CE   manual={cross_entropy(logits, 0):.4f}  torch={torch_ce:.4f}")
+
+    torch_bce = nn.BCEWithLogitsLoss()(torch.tensor([1.5]), torch.tensor([1.0]))
+    print(f"BCE  manual={binary_cross_entropy(1.5, 1):.4f}  torch={torch_bce:.4f}")
+
+    print(
+        "\nWhich loss?\n"
+        "  predict a number           -> MSE (default) or MAE (outliers)\n"
+        "  yes/no                     -> BCEWithLogitsLoss\n"
+        "  1 of N classes             -> CrossEntropyLoss (feed raw logits, no softmax)\n"
+        "  several labels at once     -> BCEWithLogitsLoss per label"
+    )
+
+
+if __name__ == "__main__":
+    main()
 ```
 
-Run it:
+**Run it:** `uv run python -m crop_ml.theory.loss_functions`. Each "manual" value matches
+its "torch" value, which proves the formula is right.
 
-```bash
-python src/loss_functions.py
-```
-
----
+| Task | Loss | PyTorch |
+|---|---|---|
+| Predict a number | MSE (default) / MAE (outliers) | `nn.MSELoss`, `nn.L1Loss` |
+| Yes / no | Binary cross-entropy | `nn.BCEWithLogitsLoss` |
+| One of N classes (**our task**) | Cross-entropy | `nn.CrossEntropyLoss` (takes raw logits) |
+| Several labels at once | BCE per label | `nn.BCEWithLogitsLoss` |
 
 ### 4.5 What a CNN Actually Does
-
-Understanding this lets you answer *"explain how a convolutional neural network
-works"* in an interview without memorising a script.
 
 ```mermaid
 flowchart TB
     subgraph Input
-        A["Image\n224×224×3\n(RGB pixels)"]
+        A["Image<br/>224×224×3 RGB"]
     end
-    subgraph "Conv Block 1"
-        B["Conv layer\nlearns edges\n& colours"]
-        C["ReLU\nremove negatives"]
-        D["MaxPool\nshrink spatial size\n÷2"]
+    subgraph "Early layers"
+        B["Conv + BatchNorm + ReLU<br/>edges, colours"]
     end
-    subgraph "Conv Block 2"
-        E["Conv layer\nlearns textures\n& patterns"]
-        F["ReLU"]
-        G["MaxPool"]
+    subgraph "Middle layers"
+        E["Conv blocks<br/>textures, spots, lesions"]
     end
-    subgraph "Conv Block N"
-        H["Conv layer\nlearns shapes\n& objects"]
+    subgraph "Late layers"
+        H["Conv blocks<br/>leaf shapes, disease patterns"]
     end
-    subgraph "Classifier Head"
-        I["Global Avg Pool\nflatten to 1D"]
-        J["Linear layer\nN → num_classes"]
-        K["Softmax\nprobabilities"]
+    subgraph "Classifier head (the part we retrain)"
+        I["Global average pool<br/>→ 1280 numbers"]
+        J["Dropout + Linear<br/>1280 → 15 logits"]
     end
-    A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K
+    A --> B --> E --> H --> I --> J
+    J -. "softmax (only at inference;<br/>CrossEntropyLoss applies it internally)" .-> K["Probabilities"]
 ```
-
-**What each component does — memorise these:**
 
 | Component | What it does | Intuition |
 |---|---|---|
-| Convolutional layer | Slides a small filter over the image, computes dot products | Like finding a template pattern anywhere in the image |
-| ReLU activation | Sets negative values to 0 | Non-linearity — without it the whole network collapses to linear |
-| MaxPooling | Takes the maximum value from each patch | Reduces size while keeping the strongest signal |
-| Batch Normalisation | Normalises activations across the batch | Stabilises training — most modern CNNs use it |
-| Dropout | Randomly zeros some outputs during training | Regularisation — forces the network to not rely on any single path |
-| Global Average Pooling | Averages each feature map to a single value | Converts spatial features to a flat vector |
-| Linear (fully connected) | Matrix multiply to produce class scores | The actual classifier at the end |
-| Softmax | Converts scores to probabilities that sum to 1 | Makes output interpretable as confidence |
+| Convolutional layer | Slides a small filter over the image, computing dot products | Finds a pattern anywhere in the image |
+| ReLU | Sets negative values to 0 | Non-linearity; without it the network collapses to one linear map |
+| Pooling / stride | Shrinks the spatial size | Keeps the strongest signal, cuts compute |
+| Batch normalisation | Normalises activations per channel | Stabilises and speeds up training |
+| Dropout | Randomly zeros activations during training | Regularisation: no single path can be relied on |
+| Global average pooling | Averages each feature map to one number | Turns a feature map into a flat vector |
+| Linear layer | Matrix multiply to class scores (logits) | The actual classifier |
+| Softmax | Turns logits into probabilities that sum to 1 | Readable confidence |
+
+MobileNetV2 replaces ordinary convolutions with *depthwise-separable* ones, which need
+~8–9× fewer operations. That is why it runs well on phones (Phases 6–7).
 
 ---
 
 ## 5. Week 2 — Data Work
 
-> The most underestimated part of ML. Real ML engineers spend 60–70% of their
-> time here. Most tutorials skip it. Yours won't.
+> Real ML engineers spend most of their time here. Most tutorials skip it. Yours won't.
 
 ### 5.1 Download the PlantVillage Dataset
 
+**Dataset facts** (Kaggle `emmarex/plantdisease`, counted after download): **20,638 images**,
+**15 classes** across pepper, potato and tomato. The zip is **≈690 MB**, because it also contains a
+duplicate copy of everything in a nested `PlantVillage/PlantVillage/` folder. (The full PlantVillage
+set has 38 classes and 54k images; this Kaggle version is the 15-class subset.)
+
 ```bash
-# From inside ml-foundations/ with venv active
-
-# Download dataset — 54,000 images, 38 disease classes, ~2.5 GB
-kaggle datasets download -d emmarex/plantdisease --path data/
-
-# Unzip into the plantvillage subfolder
-unzip data/plantdisease.zip -d data/plantvillage/
-
-# Inspect the structure — understand what you downloaded
-ls data/plantvillage/PlantVillage/
-
-# Count images per class to understand scale
-find data/plantvillage/PlantVillage -name "*.jpg" | \
-  awk -F'/' '{print $(NF-1)}' | \
-  sort | uniq -c | sort -rn | head -20
-
-# Total image count
-find data/plantvillage/PlantVillage -name "*.jpg" | wc -l
+cd ml-training
+uv run kaggle datasets download -d emmarex/plantdisease -p data/ --unzip   # slow: ~690 MB
+ls data/PlantVillage
 ```
 
-Expected output after `ls`:
+**Expected output:** 15 class folders plus the nested `PlantVillage` duplicate (which `data.py`
+ignores, because it holds no images directly):
+
 ```
-Apple___Apple_scab
-Apple___Black_rot
-Apple___Cedar_apple_rust
-Apple___healthy
-Blueberry___healthy
-Cherry_(including_sour)___Powdery_mildew
-...
-Tomato___Early_blight
-Tomato___Late_blight
-Tomato___healthy
+Pepper__bell___Bacterial_spot   Tomato_Bacterial_spot                          Tomato__Target_Spot
+Pepper__bell___healthy          Tomato_Early_blight                            Tomato__Tomato_YellowLeaf__Curl_Virus
+Potato___Early_blight           Tomato_Late_blight                             Tomato__Tomato_mosaic_virus
+Potato___Late_blight            Tomato_Leaf_Mold                               Tomato_healthy
+Potato___healthy                Tomato_Septoria_leaf_spot                      Tomato_Spider_mites_Two_spotted_spider_mite
 ```
 
-Each folder is one class. This is the `ImageFolder` format that PyTorch reads
-natively — classes are inferred from directory names.
+**Two traps in this dataset**, both handled in `data.py`:
 
----
+1. **Inconsistent folder names.** Three styles exist: `Potato___Early_blight` (three underscores),
+   `Tomato__Target_Spot` (two) and `Tomato_Bacterial_spot` (one). A naive `split("___")` mislabels
+   every tomato class. `parse_class_name()` uses the longest separator present.
+2. **Mixed-case extensions.** Many files are `.JPG`. `glob("*.jpg")` and `find -name "*.jpg"`
+   are case-sensitive and silently miss them, so the code compares `suffix.lower()`.
 
-### 5.2 Exploratory Data Analysis (EDA)
+If your copy has a different layout, point the code at the folder that *contains* the class
+folders with `--data-dir`.
 
-**File:** `notebooks/02_plantvillage_eda.ipynb`
+### 5.2 The Data Module
 
-Create this notebook in Jupyter. Each section below is one cell.
+This one module turns a folder of images into DataLoaders. Read its docstring first: it lists the
+four bugs it avoids.
+
+**File:** `ml-training/src/crop_ml/data.py`
 
 ```python
-# Cell 1 — imports
-# Always put all imports in the first cell for reproducibility
+"""Find images, label them, split them, and build DataLoaders.
 
-import os
+Dataset layout (Kaggle `emmarex/plantdisease`, 15 classes, ~20.6k images):
+
+    data/plantvillage/PlantVillage/
+        Pepper__bell___Bacterial_spot/xxx.JPG
+        Potato___Early_blight/...
+        Tomato__Target_Spot/...          <- some folders use "__"
+        Tomato_Bacterial_spot/...        <- and some a single "_"
+
+Things this module gets right that are easy to get wrong:
+- File extensions are mixed case (.JPG / .jpg), so matching is case-insensitive.
+- The split is stratified, so rare classes appear in val and test too.
+- Each split has its own Dataset object, so train gets augmentation and
+  val/test do not.
+- The balancing sampler is built from *train* labels only, so it can never
+  draw a val/test image into training.
+"""
+
 import json
-from pathlib import Path
 from collections import Counter
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-import seaborn as sns
-from PIL import Image
-from tqdm import tqdm
-
-# Set consistent plot style
-plt.style.use("seaborn-v0_8-whitegrid")
-sns.set_palette("husl")
-
-# Dataset root — adjust if your path differs
-DATA_ROOT = Path("../data/plantvillage/PlantVillage")
-```
-
-```python
-# Cell 2 — build a metadata dataframe
-# Before any modelling, understand your data as a table.
-# This dataframe is what you reference throughout the notebook.
-
-def build_metadata(data_root: Path) -> pd.DataFrame:
-    """
-    Walk the dataset directory and collect one row per image.
-    Columns: filepath, class_name, plant, condition, file_size_kb, is_healthy
-    """
-    records = []
-    for class_dir in sorted(data_root.iterdir()):
-        if not class_dir.is_dir():
-            continue
-
-        class_name = class_dir.name               # e.g. "Tomato___Early_blight"
-        parts = class_name.split("___")
-        plant = parts[0].replace("_", " ")        # e.g. "Tomato"
-        condition = parts[1].replace("_", " ") if len(parts) > 1 else "unknown"
-        is_healthy = "healthy" in condition.lower()
-
-        for img_path in class_dir.glob("*.jpg"):
-            records.append({
-                "filepath":    str(img_path),
-                "class_name":  class_name,
-                "plant":       plant,
-                "condition":   condition,
-                "file_size_kb": img_path.stat().st_size / 1024,
-                "is_healthy":  is_healthy,
-            })
-
-    return pd.DataFrame(records)
-
-df = build_metadata(DATA_ROOT)
-
-# Basic summary — always look at this first
-print(f"Total images:  {len(df):,}")
-print(f"Total classes: {df['class_name'].nunique()}")
-print(f"Unique plants: {df['plant'].nunique()}")
-print(f"\nHealthy vs Diseased:")
-print(df["is_healthy"].value_counts().to_string())
-print(f"\nFirst 5 rows:")
-df.head()
-```
-
-```python
-# Cell 3 — class distribution plot
-# Critical for detecting class imbalance before training.
-# An imbalanced dataset will give you misleadingly high accuracy
-# while failing completely on minority classes.
-
-class_counts = df["class_name"].value_counts().sort_values()
-
-fig, ax = plt.subplots(figsize=(10, 12))
-bars = ax.barh(
-    [c.replace("___", "\n") for c in class_counts.index],
-    class_counts.values,
-    color=["#2ecc71" if "healthy" in c else "#e74c3c" for c in class_counts.index]
-)
-ax.set_xlabel("Number of images")
-ax.set_title("Class Distribution — PlantVillage Dataset\n(green = healthy, red = diseased)")
-ax.axvline(class_counts.mean(), color="navy", linestyle="--", label=f"Mean: {class_counts.mean():.0f}")
-ax.legend()
-plt.tight_layout()
-plt.savefig("../outputs/plots/class_distribution.png", dpi=150, bbox_inches="tight")
-plt.show()
-
-# Print imbalance ratio — you will be asked about this in interviews
-print(f"Largest class:  {class_counts.max():,} images")
-print(f"Smallest class: {class_counts.min():,} images")
-print(f"Imbalance ratio (max/min): {class_counts.max() / class_counts.min():.1f}x")
-```
-
-```python
-# Cell 4 — image dimension analysis
-# CNNs require fixed-size input. Understanding the raw size distribution
-# tells you what resize strategy to use.
-
-def sample_dimensions(df: pd.DataFrame, n: int = 500) -> pd.DataFrame:
-    """Sample n images and record their dimensions. Full scan takes too long."""
-    sample = df.sample(n=min(n, len(df)), random_state=42)
-    widths, heights = [], []
-    for path in tqdm(sample["filepath"], desc="Reading dimensions"):
-        with Image.open(path) as img:
-            w, h = img.size
-            widths.append(w)
-            heights.append(h)
-    return pd.DataFrame({"width": widths, "height": heights})
-
-dims = sample_dimensions(df)
-
-fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-axes[0].hist(dims["width"],  bins=30, color="steelblue", edgecolor="white")
-axes[0].set_title("Width distribution")
-axes[0].set_xlabel("Width (px)")
-axes[1].hist(dims["height"], bins=30, color="tomato",    edgecolor="white")
-axes[1].set_title("Height distribution")
-axes[1].set_xlabel("Height (px)")
-plt.tight_layout()
-plt.savefig("../outputs/plots/image_dimensions.png", dpi=150, bbox_inches="tight")
-plt.show()
-
-print(f"Width  — mean: {dims['width'].mean():.0f}  min: {dims['width'].min()}  max: {dims['width'].max()}")
-print(f"Height — mean: {dims['height'].mean():.0f}  min: {dims['height'].min()}  max: {dims['height'].max()}")
-```
-
-```python
-# Cell 5 — visual sample grid
-# Always look at your data with your eyes before training anything.
-# This catches label errors, bad files, and unexpected patterns.
-
-def show_sample_grid(df: pd.DataFrame, n_classes: int = 6, n_per_class: int = 4):
-    """Show a grid of sample images — one row per class."""
-    classes = df["class_name"].sample(n=n_classes, random_state=42).unique()
-    fig, axes = plt.subplots(n_classes, n_per_class, figsize=(n_per_class * 3, n_classes * 3))
-
-    for row_idx, class_name in enumerate(classes):
-        class_images = df[df["class_name"] == class_name].sample(n=n_per_class, random_state=row_idx)
-        for col_idx, (_, img_row) in enumerate(class_images.iterrows()):
-            img = mpimg.imread(img_row["filepath"])
-            axes[row_idx, col_idx].imshow(img)
-            axes[row_idx, col_idx].axis("off")
-            if col_idx == 0:
-                label = class_name.replace("___", "\n").replace("_", " ")
-                axes[row_idx, col_idx].set_ylabel(label, fontsize=8, rotation=0,
-                                                   ha="right", va="center")
-
-    plt.suptitle("Sample images per class", fontsize=13, y=1.01)
-    plt.tight_layout()
-    plt.savefig("../outputs/plots/sample_grid.png", dpi=150, bbox_inches="tight")
-    plt.show()
-
-show_sample_grid(df)
-```
-
-```python
-# Cell 6 — save metadata to CSV for reference in later phases
-# Other notebooks and scripts will load this instead of re-scanning the filesystem.
-
-df.to_csv("../data/metadata.csv", index=False)
-print(f"Saved metadata for {len(df):,} images → data/metadata.csv")
-
-# Also save class names as JSON — needed by the model in Phase 2
-class_names = sorted(df["class_name"].unique().tolist())
-with open("../data/class_names.json", "w") as f:
-    json.dump(class_names, f, indent=2)
-print(f"Saved {len(class_names)} class names → data/class_names.json")
-```
-
----
-
-### 5.3 Class Imbalance Detection
-
-**File:** `src/dataset.py`
-
-```python
-# src/dataset.py
-#
-# Dataset loading, splitting, and imbalance handling.
-# Keeping this in a .py module (not a notebook) means Phase 2 can import it directly.
-
-import json
+from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
+import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
-from torchvision import datasets
-from torchvision.transforms import v2 as T
 from PIL import Image
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+
+from crop_ml.config import TrainConfig
+from crop_ml.transforms import build_eval_transforms, build_train_transforms
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 
-def compute_class_weights(dataset: datasets.ImageFolder) -> torch.Tensor:
+def parse_class_name(folder: str) -> tuple[str, str]:
+    """Split a PlantVillage folder name into (plant, condition).
+
+    >>> parse_class_name("Pepper__bell___Bacterial_spot")
+    ('Pepper bell', 'Bacterial spot')
+    >>> parse_class_name("Tomato__Target_Spot")
+    ('Tomato', 'Target Spot')
+    >>> parse_class_name("Tomato_Bacterial_spot")
+    ('Tomato', 'Bacterial spot')
     """
-    Compute per-class weights inversely proportional to class frequency.
+    # Three naming styles exist in this dataset: "Potato___Early_blight",
+    # "Tomato__Target_Spot" and "Tomato_Bacterial_spot". Use the longest separator present.
+    sep = next((s for s in ("___", "__", "_") if s in folder), "_")
+    plant, _, condition = folder.partition(sep)
 
-    Why: if class A has 1000 images and class B has 100, the model sees
-    class A 10x more and learns to always predict A. Weighting corrects this.
+    def clean(s: str) -> str:
+        return " ".join(s.replace("_", " ").split())
 
-    Formula: weight[class] = total_samples / (num_classes * count[class])
+    return clean(plant), clean(condition) or "unknown"
+
+
+def scan_images(data_dir: Path) -> pd.DataFrame:
+    """One row per image: path, class_name, label (int), plant, condition.
+
+    Labels are assigned in sorted folder order; that order is saved as
+    class_names.json and must never change between training and serving.
     """
-    counts = np.bincount([label for _, label in dataset.samples])
-    total = len(dataset)
-    n_classes = len(dataset.classes)
+    if not data_dir.is_dir():
+        raise FileNotFoundError(f"Dataset folder not found: {data_dir}")
+    # Only folders that directly contain images are classes. The Kaggle zip also holds a
+    # nested duplicate "PlantVillage/" folder with no images of its own; counting it as a
+    # class would shift every label index after it.
+    class_dirs = sorted(d for d in data_dir.iterdir()
+                        if d.is_dir() and any(f.suffix.lower() in IMAGE_EXTENSIONS for f in d.iterdir()))
+    rows = []
+    for label, d in enumerate(class_dirs):
+        plant, condition = parse_class_name(d.name)
+        for f in sorted(d.iterdir()):
+            if f.suffix.lower() in IMAGE_EXTENSIONS:
+                rows.append({"path": str(f), "class_name": d.name, "label": label,
+                             "plant": plant, "condition": condition})
+    if not rows:
+        raise ValueError(f"No images found under {data_dir}")
+    return pd.DataFrame(rows)
 
-    # Classes with fewer samples get higher weight
-    weights = total / (n_classes * counts.astype(float))
 
-    # Per-sample weights — each sample gets its class weight
-    sample_weights = torch.tensor(
-        [weights[label] for _, label in dataset.samples],
-        dtype=torch.float32
-    )
-    return sample_weights
+@dataclass
+class Splits:
+    train: pd.DataFrame
+    val: pd.DataFrame
+    test: pd.DataFrame
+    class_names: list[str]
+
+    def save(self, path: Path) -> None:
+        """Write the exact file lists so evaluation re-uses the same test set."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "class_names": self.class_names,
+            **{k: getattr(self, k)[["path", "label"]].to_dict("records") for k in ("train", "val", "test")},
+        }))
+
+    @classmethod
+    def load(cls, path: Path) -> "Splits":
+        raw = json.loads(path.read_text())
+        return cls(*(pd.DataFrame(raw[k]) for k in ("train", "val", "test")), class_names=raw["class_names"])
 
 
-def create_weighted_sampler(dataset: datasets.ImageFolder) -> WeightedRandomSampler:
+def split_dataset(df: pd.DataFrame, val_fraction: float, test_fraction: float, seed: int) -> Splits:
+    """Stratified train/val/test split (class proportions kept in every split).
+
+    Note: PlantVillage holds several photos of the same leaf, so a random split
+    still lets near-duplicates land in both train and test. Treat test accuracy
+    as optimistic; real field photos will score lower.
     """
-    Create a sampler that oversamples minority classes so each epoch
-    sees a roughly balanced representation of all classes.
+    class_names = sorted(df["class_name"].unique())
+    train_val, test = train_test_split(df, test_size=test_fraction, stratify=df["label"], random_state=seed)
+    rel_val = val_fraction / (1 - test_fraction)
+    train, val = train_test_split(train_val, test_size=rel_val, stratify=train_val["label"], random_state=seed)
+    return Splits(*(s.reset_index(drop=True) for s in (train, val, test)), class_names=class_names)
+
+
+class LeafDataset(Dataset):
+    """Loads images from a split DataFrame and applies one transform."""
+
+    def __init__(self, frame: pd.DataFrame, transform) -> None:
+        self.paths = frame["path"].tolist()
+        self.labels = frame["label"].tolist()
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.paths)
+
+    def __getitem__(self, i: int) -> tuple[torch.Tensor, int]:
+        with Image.open(self.paths[i]) as img:
+            return self.transform(img.convert("RGB")), self.labels[i]
+
+
+def make_balanced_sampler(labels: list[int]) -> WeightedRandomSampler:
+    """Sample each training image with probability 1/(its class count).
+
+    Rare classes get drawn as often as common ones, which counters the ~20x
+    imbalance in this dataset. Built from train labels only.
     """
-    sample_weights = compute_class_weights(dataset)
-    return WeightedRandomSampler(
-        weights=sample_weights,
-        num_samples=len(sample_weights),
-        replacement=True   # allows same image to appear multiple times per epoch
-    )
+    counts = Counter(labels)
+    weights = torch.tensor([1.0 / counts[y] for y in labels], dtype=torch.double)
+    return WeightedRandomSampler(weights, num_samples=len(labels), replacement=True)
 
 
-def create_dataloaders(
-    data_root: str,
-    train_transforms: T.Compose,
-    val_transforms: T.Compose,
-    val_split: float = 0.15,
-    test_split: float = 0.10,
-    batch_size: int = 32,
-    num_workers: int = 4,
-    use_weighted_sampler: bool = True,
-    seed: int = 42,
-) -> tuple[DataLoader, DataLoader, DataLoader, list[str]]:
-    """
-    Load the dataset from disk, split into train/val/test, and return DataLoaders.
-
-    Returns: (train_loader, val_loader, test_loader, class_names)
-    """
-    torch.manual_seed(seed)
-
-    # ImageFolder infers class labels from directory names
-    full_dataset = datasets.ImageFolder(data_root)
-    class_names = full_dataset.classes
-    n_total = len(full_dataset)
-
-    # Calculate split sizes
-    n_test  = int(n_total * test_split)
-    n_val   = int(n_total * val_split)
-    n_train = n_total - n_val - n_test
-
-    print(f"Dataset split → train: {n_train:,}  val: {n_val:,}  test: {n_test:,}")
-
-    # Random split — use a fixed generator for reproducibility
-    generator = torch.Generator().manual_seed(seed)
-    train_ds, val_ds, test_ds = torch.utils.data.random_split(
-        full_dataset, [n_train, n_val, n_test], generator=generator
-    )
-
-    # Apply different transforms to each split
-    # Train gets augmentation; val and test get only resizing and normalisation
-    train_ds.dataset.transform = train_transforms
-    val_ds.dataset.transform   = val_transforms
-    test_ds.dataset.transform  = val_transforms
-
-    # Sampler handles class imbalance at the DataLoader level
-    sampler = create_weighted_sampler(full_dataset) if use_weighted_sampler else None
-
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=batch_size,
-        sampler=sampler,           # use weighted sampler for balanced batches
-        shuffle=(sampler is None), # shuffle only if not using sampler (mutually exclusive)
-        num_workers=num_workers,
-        pin_memory=True,           # faster GPU transfers on CUDA; harmless on MPS
-    )
-    val_loader = DataLoader(
-        val_ds,
-        batch_size=batch_size,
-        shuffle=False,             # always False for validation — order doesn't matter
-        num_workers=num_workers,
-        pin_memory=True,
-    )
-    test_loader = DataLoader(
-        test_ds,
-        batch_size=batch_size,
-        shuffle=False,             # always False for test — order doesn't matter
-        num_workers=num_workers,
-        pin_memory=True,
-    )
-
-    return train_loader, val_loader, test_loader, class_names
+def build_dataloaders(cfg: TrainConfig, splits: Splits) -> dict[str, DataLoader]:
+    """Return {"train", "val", "test"} DataLoaders for the given splits."""
+    train_tf = build_train_transforms(cfg.image_size, cfg.mean, cfg.std)
+    eval_tf = build_eval_transforms(cfg.image_size, cfg.mean, cfg.std)
+    common = {
+        "batch_size": cfg.batch_size,
+        "num_workers": cfg.num_workers,
+        "persistent_workers": cfg.num_workers > 0,
+        "pin_memory": torch.cuda.is_available(),  # only useful (and supported) on CUDA
+    }
+    return {
+        "train": DataLoader(LeafDataset(splits.train, train_tf),
+                            sampler=make_balanced_sampler(splits.train["label"].tolist()), **common),
+        "val": DataLoader(LeafDataset(splits.val, eval_tf), shuffle=False, **common),
+        "test": DataLoader(LeafDataset(splits.test, eval_tf), shuffle=False, **common),
+    }
 ```
 
----
+How the pieces fit:
 
-### 5.4 Image Preprocessing Pipeline
+```mermaid
+flowchart TD
+    F[Class folders] --> SC["scan_images()<br/>DataFrame: path, label, plant, condition"]
+    SC --> SP["split_dataset()<br/>stratified 75 / 15 / 10"]
+    SP --> TR[train rows] & VA[val rows] & TE[test rows]
+    SP -. "saved to outputs/splits.json" .-> J[(splits.json)]
+    TR --> DTR["LeafDataset + train transforms<br/>(augmentation)"]
+    VA --> DVA["LeafDataset + eval transforms"]
+    TE --> DTE["LeafDataset + eval transforms"]
+    TR --> SM["make_balanced_sampler()<br/>weights from TRAIN labels only"]
+    SM --> LTR[train DataLoader]
+    DTR --> LTR
+    DVA --> LVA[val DataLoader]
+    DTE --> LTE[test DataLoader]
+```
 
-**File:** `src/transforms.py`
+### 5.3 Exploratory Data Analysis (EDA)
+
+**File:** `ml-training/src/crop_ml/eda.py`
 
 ```python
-# src/transforms.py
-#
-# Image preprocessing pipelines for training and validation.
-#
-# KEY RULE: training and validation pipelines MUST be different.
-#   Training:   augmentation (random flips, crops, colour jitter) + normalise
-#   Validation: deterministic (fixed resize) + normalise ONLY
-#
-# The validation/test pipeline must be deterministic — running it twice on
-# the same image should produce identical output. Augmentation on val/test
-# is a common bug that makes metrics unreliable.
+"""Exploratory data analysis: what is in the dataset before we train on it.
 
-from torchvision.transforms import v2 as T
+Run (from ml-training/, after downloading the data):
+    uv run python -m crop_ml.eda
 
+Writes:
+    data/metadata.csv                    one row per image (path, class, plant, condition, size)
+    outputs/plots/class_distribution.png images per class (shows the imbalance)
+    outputs/plots/image_sizes.png        width/height spread
+    outputs/plots/sample_grid.png        one example image per class
+"""
 
-# ImageNet normalisation constants — use these whenever you load a model
-# pretrained on ImageNet (MobileNetV2, ResNet, EfficientNet, etc.)
-# The model learned to expect inputs in this specific range.
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD  = [0.229, 0.224, 0.225]
+import argparse
+from pathlib import Path
 
-# MobileNetV2 expects 224×224 input
-INPUT_SIZE = 224
+import matplotlib
 
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import pandas as pd  # noqa: E402
+from PIL import Image  # noqa: E402
 
-def get_train_transforms() -> T.Compose:
-    """
-    Training transforms with augmentation.
-
-    Each augmentation is chosen to simulate real-world variation in crop photos:
-    - Random crop: camera isn't always perfectly centred
-    - Horizontal flip: leaf orientation is arbitrary
-    - Colour jitter: lighting conditions vary
-    - Rotation: phone camera angle varies
-    - Erase: simulate partial occlusion (leaf behind another leaf)
-    """
-    return T.Compose([
-        # Step 1: Resize to slightly larger than target to allow random crop
-        T.Resize((256, 256)),
-
-        # Step 2: Random crop to target size — simulates imperfect framing
-        T.RandomCrop(INPUT_SIZE),
-
-        # Step 3: Horizontal flip with 50% probability — disease patterns are symmetric
-        T.RandomHorizontalFlip(p=0.5),
-
-        # Step 4: Colour jitter — accounts for varying light and camera settings
-        # brightness: how dark/light, contrast: colour vividness,
-        # saturation: colour intensity, hue: colour tint
-        T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.1),
-
-        # Step 5: Small rotation — field photos aren't always level
-        T.RandomRotation(degrees=15),
-
-        # Step 6: Convert PIL image to PyTorch tensor (0–255 → 0.0–1.0)
-        T.ToTensor(),
-
-        # Step 7: Random erasing — simulate leaves partially behind other leaves
-        # Placed AFTER ToTensor because it operates on tensors
-        T.RandomErasing(p=0.2, scale=(0.02, 0.1)),
-
-        # Step 8: Normalise using ImageNet stats
-        # Formula per channel: (pixel - mean) / std
-        # Result: values roughly centred around 0 with std ≈ 1
-        T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-    ])
+from crop_ml.config import TrainConfig  # noqa: E402
+from crop_ml.data import scan_images  # noqa: E402
 
 
-def get_val_transforms() -> T.Compose:
-    """
-    Validation and test transforms — deterministic, no augmentation.
-
-    Must produce identical output every time for reliable evaluation metrics.
-    The only processing is resize + tensor conversion + normalise.
-    """
-    return T.Compose([
-        # Resize directly to target — no random crop
-        T.Resize((INPUT_SIZE, INPUT_SIZE)),
-
-        # Convert to tensor
-        T.ToTensor(),
-
-        # Same normalisation as training — the model expects these stats
-        T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-    ])
+def add_image_sizes(df: pd.DataFrame) -> pd.DataFrame:
+    """Add width/height columns (reads only the image header, so it is fast)."""
+    sizes = [Image.open(p).size for p in df["path"]]
+    return df.assign(width=[w for w, _ in sizes], height=[h for _, h in sizes])
 
 
-def denormalise(tensor):
-    """
-    Reverse the normalisation for visualising model inputs.
-    Useful for debugging — lets you see what the model is actually seeing.
-    """
-    import torch
-    mean = torch.tensor(IMAGENET_MEAN).view(3, 1, 1)
-    std  = torch.tensor(IMAGENET_STD).view(3, 1, 1)
-    return (tensor * std + mean).clamp(0, 1)
+def class_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Images per class, largest first, with share of the dataset."""
+    counts = df.groupby("class_name").size().sort_values(ascending=False).rename("images").to_frame()
+    counts["share_%"] = (100 * counts["images"] / counts["images"].sum()).round(1)
+    return counts
+
+
+def plot_class_distribution(summary: pd.DataFrame, path: Path) -> None:
+    fig, ax = plt.subplots(figsize=(10, 6))
+    summary["images"].sort_values().plot.barh(ax=ax, color="seagreen")
+    ax.set(xlabel="Images", ylabel="", title="Images per class")
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_image_sizes(df: pd.DataFrame, path: Path) -> None:
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.scatter(df["width"], df["height"], s=4, alpha=0.3)
+    ax.set(xlabel="Width (px)", ylabel="Height (px)", title="Image dimensions")
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_sample_grid(df: pd.DataFrame, path: Path, cols: int = 5) -> None:
+    """One random image from every class, titled with its class name."""
+    samples = df.groupby("class_name").sample(n=1, random_state=0)
+    rows = -(-len(samples) // cols)  # ceiling division
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3.2))
+    for ax in axes.flat:
+        ax.axis("off")
+    for ax, (_, r) in zip(axes.flat, samples.iterrows(), strict=False):
+        ax.imshow(Image.open(r["path"]).convert("RGB"))
+        ax.set_title(f"{r['plant']}\n{r['condition']}", fontsize=8)  # title still shows with axis off
+    fig.savefig(path, dpi=120, bbox_inches="tight")
+    plt.close(fig)
+
+
+def run(data_dir: Path, output_dir: Path, metadata_csv: Path) -> pd.DataFrame:
+    df = add_image_sizes(scan_images(data_dir))
+    summary = class_summary(df)
+    print(summary.to_string())
+    print(f"\n{len(df)} images, {len(summary)} classes, "
+          f"imbalance (largest/smallest) = {summary['images'].max() / summary['images'].min():.1f}x")
+
+    plots = output_dir / "plots"
+    plots.mkdir(parents=True, exist_ok=True)
+    plot_class_distribution(summary, plots / "class_distribution.png")
+    plot_image_sizes(df, plots / "image_sizes.png")
+    plot_sample_grid(df, plots / "sample_grid.png")
+    metadata_csv.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(metadata_csv, index=False)
+    print(f"Saved plots -> {plots}/ and metadata -> {metadata_csv}")
+    return df
+
+
+if __name__ == "__main__":
+    d = TrainConfig()
+    p = argparse.ArgumentParser(description="Explore the PlantVillage dataset.")
+    p.add_argument("--data-dir", type=Path, default=d.data_dir)
+    p.add_argument("--output-dir", type=Path, default=d.output_dir)
+    p.add_argument("--metadata-csv", type=Path, default=Path("data/metadata.csv"))
+    a = p.parse_args()
+    run(a.data_dir, a.output_dir, a.metadata_csv)
 ```
 
----
+**Run it:**
 
-### 5.5 Train / Validation / Test Splits
+```bash
+uv run python -m crop_ml.eda
+```
+
+It prints a table of images per class, then a summary line of the form `<N> images, 15 classes,
+imbalance (largest/smallest) = <ratio>x` (expect roughly 20,600 images and a ratio around 20x), and saves three plots plus `data/metadata.csv`. The notebook
+`02_plantvillage_eda.ipynb` runs the same code and adds `df.info()`, `describe()` and a
+plant × condition pivot table.
+
+### 5.4 Class Imbalance
+
+The biggest class (a tomato disease, ~3,200 images) has roughly **20× more images** than the smallest
+(potato healthy, ~150). Check the exact ratio in your own EDA output. Trained naively, the model learns to favour big classes.
+
+| Fix | How | Used here |
+|---|---|---|
+| Oversample rare classes | `WeightedRandomSampler`, weight = 1 / class count | ✅ `make_balanced_sampler()` |
+| Weight the loss | `CrossEntropyLoss(weight=...)` | ❌ do *one* of the two, not both |
+| Judge with macro F1 | Average F1 over classes equally | ✅ `evaluate.py` |
+| Collect more data | — | Not possible here |
 
 ```mermaid
 flowchart LR
-    A["Full dataset\n54,306 images"] --> B["Train\n75% — 40,730\nModel learns from this"]
-    A --> C["Validation\n15% — 8,146\nTune hyperparameters"]
-    A --> D["Test\n10% — 5,430\nFinal honest evaluation"]
-
-    style B fill:#e8f5e9,stroke:#43a047
-    style C fill:#fff3e0,stroke:#fb8c00
-    style D fill:#fce4ec,stroke:#e91e63
+    subgraph Without sampler
+        A1["Batch: mostly the 3 biggest classes"]
+    end
+    subgraph With balanced sampler
+        A2["Batch: classes in ≈ equal share"]
+    end
+    W["weight per image = 1 / count of its class"] --> A2
 ```
 
-**Why three splits, not two:**
+### 5.5 Image Preprocessing Pipeline
 
-- **Train**: the model sees this and learns from it
-- **Validation**: you check this after each epoch to tune hyperparameters (learning rate, epochs). Since *you* look at this during training, the model indirectly sees it — it can overfit to val through your tuning decisions
-- **Test**: you look at this *exactly once*, after all tuning is done. This is your honest estimate of real-world performance. If you peek at test during tuning, your reported accuracy is a lie
+**File:** `ml-training/src/crop_ml/transforms.py`
 
-**Data leakage** — a common interview topic: if any augmented version of a test
-image appears in training, your test accuracy is inflated. Always split on the
-*original* images before augmentation, not after.
+```python
+"""Image preprocessing pipelines (torchvision.transforms.v2).
+
+Train: random crop/flip/rotation/colour jitter, so the model sees varied leaves.
+Eval:  deterministic resize + centre crop. The Phase 2 service must apply
+       exactly this eval pipeline; the checkpoint stores image_size/mean/std
+       so it can.
+"""
+
+import torch
+from torchvision.transforms import v2 as T
+
+from crop_ml.config import IMAGENET_MEAN, IMAGENET_STD
+
+
+def _to_normalized_tensor(mean: tuple[float, ...], std: tuple[float, ...]) -> list:
+    # ToImage + ToDtype(scale=True) replaces the deprecated ToTensor(): uint8 [0,255] -> float [0,1]
+    return [T.ToImage(), T.ToDtype(torch.float32, scale=True), T.Normalize(mean, std)]
+
+
+def build_train_transforms(
+    image_size: int = 224, mean: tuple[float, ...] = IMAGENET_MEAN, std: tuple[float, ...] = IMAGENET_STD
+) -> T.Compose:
+    """Augmenting pipeline for training images (PIL in, normalised CxHxW tensor out)."""
+    return T.Compose([
+        T.RandomResizedCrop(image_size, scale=(0.7, 1.0)),
+        T.RandomHorizontalFlip(),
+        T.RandomVerticalFlip(),  # leaf photos have no fixed "up"
+        T.RandomRotation(20),
+        T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        *_to_normalized_tensor(mean, std),
+    ])
+
+
+def build_eval_transforms(
+    image_size: int = 224, mean: tuple[float, ...] = IMAGENET_MEAN, std: tuple[float, ...] = IMAGENET_STD
+) -> T.Compose:
+    """Deterministic pipeline for validation, test and serving."""
+    return T.Compose([
+        T.Resize(int(image_size * 256 / 224)),  # 256 for 224: standard ImageNet ratio
+        T.CenterCrop(image_size),
+        *_to_normalized_tensor(mean, std),
+    ])
+```
+
+| Step | Train | Eval / serving | Why |
+|---|---|---|---|
+| Size | `RandomResizedCrop(224)` | `Resize(256)` + `CenterCrop(224)` | Train sees varied framing; eval is repeatable |
+| Flips / rotation | ✅ | ❌ | Leaves have no fixed orientation |
+| Colour jitter | ✅ | ❌ | Robust to lighting |
+| To float tensor | `ToImage` + `ToDtype(scale=True)` | same | Replaces the deprecated `ToTensor()` |
+| Normalise | ImageNet mean / std | same | The pretrained weights expect it |
+
+> **Contract with Phase 2:** the service must apply exactly the eval pipeline. The checkpoint
+> stores `image_size`, `mean` and `std`, and a Phase 2 test checks the result.
+
+### 5.6 Train / Validation / Test Splits
+
+```mermaid
+flowchart LR
+    D["All ≈20.6k images"] --> T["Train 75%<br/>≈15.5k<br/>learn weights"]
+    D --> V["Validation 15%<br/>≈3.1k<br/>early stopping, tuning"]
+    D --> X["Test 10%<br/>≈2.1k<br/>touched once, at the end"]
+    style T fill:#e8f5e9
+    style V fill:#fff3e0
+    style X fill:#fce4ec
+```
+
+- **Stratified**: every split keeps the class proportions, so rare classes appear in val and test too.
+- **Saved** to `outputs/splits.json`: evaluation re-uses the *exact* test files.
+- **Caveat:** PlantVillage has several photos of the same physical leaf, so near-duplicates can land in
+  both train and test. Test accuracy is therefore optimistic; expect lower accuracy on real field photos.
 
 ---
 
-### 5.6 Baseline Model Training
+## 6. Training, Evaluation and Notebooks
 
-**File:** `src/train.py`
+### 6.1 Configuration
+
+**File:** `ml-training/src/crop_ml/config.py`
 
 ```python
-# src/train.py
-#
-# Training loop for MobileNetV2 with transfer learning.
-#
-# Transfer learning: start from a model already trained on ImageNet
-# (1.2M images, 1000 classes), then adapt the final layer to our 38 classes.
-# This works because early layers learn universal features (edges, textures)
-# that are useful for any image classification task.
+"""All training settings in one place.
 
-import time
+Every CLI flag in `crop_ml.train` maps onto a field here, so a run is fully
+described by one `TrainConfig` (it is saved next to the checkpoint).
+"""
+
+from dataclasses import dataclass, field
 from pathlib import Path
 
+# ImageNet statistics: the pretrained MobileNetV2 expects inputs normalised this way.
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+
+
+@dataclass
+class TrainConfig:
+    data_dir: Path = Path("data/PlantVillage")  # folder of class sub-folders
+    output_dir: Path = Path("outputs")  # checkpoints/, plots/, splits.json
+    model_version: str = "v1"
+
+    image_size: int = 224
+    batch_size: int = 32
+    epochs: int = 10
+    lr: float = 1e-3
+    weight_decay: float = 1e-4
+    label_smoothing: float = 0.1
+    patience: int = 3  # early stopping: epochs without val-loss improvement
+    val_fraction: float = 0.15
+    test_fraction: float = 0.10
+    seed: int = 42
+    num_workers: int = 2
+    pretrained: bool = True  # False = random weights (offline tests)
+    freeze_backbone: bool = True  # train only the classifier head
+
+    mean: tuple[float, float, float] = field(default=IMAGENET_MEAN)
+    std: tuple[float, float, float] = field(default=IMAGENET_STD)
+
+    @property
+    def checkpoint_dir(self) -> Path:
+        return self.output_dir / "checkpoints"
+
+    @property
+    def plots_dir(self) -> Path:
+        return self.output_dir / "plots"
+
+    @property
+    def checkpoint_path(self) -> Path:
+        return self.checkpoint_dir / f"mobilenetv2_{self.model_version}_best.pt"
+```
+
+### 6.2 Model: Transfer Learning with MobileNetV2
+
+**File:** `ml-training/src/crop_ml/model.py`
+
+```python
+"""MobileNetV2 with a new classification head (transfer learning).
+
+MobileNetV2 is small (~3.5M params) and fast on phones, which matters for the
+Flutter/KMP phases. We reuse its ImageNet features and replace only the last layer.
+"""
+
+from torch import nn
+from torchvision.models import MobileNet_V2_Weights, mobilenet_v2
+
+
+def build_model(num_classes: int, pretrained: bool = True, freeze_backbone: bool = True) -> nn.Module:
+    """Return MobileNetV2 whose final Linear layer outputs `num_classes` logits.
+
+    pretrained=True downloads ImageNet weights once (~14 MB, cached by torch).
+    freeze_backbone=True trains only the head: fast and enough for a baseline.
+    """
+    weights = MobileNet_V2_Weights.IMAGENET1K_V2 if pretrained else None
+    model = mobilenet_v2(weights=weights)
+    if freeze_backbone:
+        for p in model.features.parameters():
+            p.requires_grad = False
+    model.classifier[1] = nn.Linear(model.last_channel, num_classes)
+    return model
+```
+
+```mermaid
+flowchart LR
+    subgraph frozen["features (frozen, ImageNet weights)"]
+        F1[17 inverted-residual blocks]
+    end
+    subgraph head["classifier (trained)"]
+        H1[Dropout 0.2] --> H2[Linear 1280 → 15]
+    end
+    IMG[Image] --> F1 --> P[Global avg pool] --> H1
+```
+
+With the backbone frozen only **19,215 parameters** (1280×15 weights + 15 biases) are trained,
+out of ~2.2 M. That is fast and is enough for a strong baseline. `--unfreeze` fine-tunes everything.
+
+### 6.3 Training Loop with Early Stopping
+
+**File:** `ml-training/src/crop_ml/train.py`
+
+```python
+"""Train the MobileNetV2 baseline and save the best checkpoint.
+
+Run (from ml-training/):
+    uv run python -m crop_ml.train                       # defaults from TrainConfig
+    uv run python -m crop_ml.train --epochs 3 --batch-size 64
+
+Writes:
+    outputs/splits.json                                 exact train/val/test file lists
+    outputs/checkpoints/mobilenetv2_v1_best.pt          best model (lowest val loss)
+    outputs/checkpoints/class_names.json                label index -> folder name
+    outputs/checkpoints/history.json                    per-epoch loss/accuracy
+
+Checkpoint contract (Phase 2 relies on these exact keys):
+    model_state_dict, num_classes, class_names, model_version,
+    val_acc, image_size, mean, std, confidence_threshold (chosen on validation data)
+"""
+
+import argparse
+import json
+import random
+import time
+from dataclasses import asdict
+from pathlib import Path
+
+import numpy as np
 import torch
-import torch.nn as nn
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torchvision import models
-from tqdm import tqdm
+from torch import nn
+from torch.utils.data import DataLoader
+
+from crop_ml.config import TrainConfig
+from crop_ml.data import build_dataloaders, scan_images, split_dataset
+from crop_ml.model import build_model
 
 
-def get_device() -> torch.device:
-    """
-    Select the best available compute device.
-    MPS = Apple Silicon GPU — much faster than CPU for M-series Macs.
-    """
+def pick_device() -> torch.device:
+    """Apple GPU (MPS) on an M-series Mac, CUDA on Nvidia, else CPU."""
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
     if torch.cuda.is_available():
         return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")   # Apple Silicon GPU — use this on your M5
     return torch.device("cpu")
 
 
-def build_model(num_classes: int, freeze_backbone: bool = True) -> nn.Module:
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+def run_epoch(model: nn.Module, loader: DataLoader, criterion: nn.Module, device: torch.device,
+              optimizer: torch.optim.Optimizer | None = None, frozen_backbone: bool = False) -> tuple[float, float]:
+    """One pass over `loader`. Trains if `optimizer` is given, else evaluates.
+
+    Returns (mean loss, accuracy).
     """
-    Load MobileNetV2 pretrained on ImageNet and replace the classifier head.
+    training = optimizer is not None
+    model.train(training)
+    if training and frozen_backbone:
+        # Frozen layers must also keep their BatchNorm statistics frozen.
+        model.features.eval()
 
-    freeze_backbone=True: only the final layer trains initially.
-      → Faster, less likely to overfit on small datasets
-      → Good default for first training run
-
-    After a few epochs you can unfreeze the backbone for fine-tuning:
-      for param in model.parameters():
-          param.requires_grad = True
-    """
-    # Load pretrained weights
-    model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
-
-    if freeze_backbone:
-        # Freeze all backbone parameters — they won't update during training
-        for param in model.parameters():
-            param.requires_grad = False
-
-    # Replace the final classifier layer
-    # Original: Linear(1280, 1000) → ImageNet classes
-    # Ours:     Linear(1280, 38)   → PlantVillage classes
-    in_features = model.classifier[1].in_features
-    model.classifier[1] = nn.Linear(in_features, num_classes)
-    # The new layer's parameters have requires_grad=True by default
-
-    total_params    = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total params:     {total_params:,}")
-    print(f"Trainable params: {trainable_params:,}  ({trainable_params/total_params*100:.1f}%)")
-
-    return model
+    total_loss, correct, seen = 0.0, 0, 0
+    with torch.set_grad_enabled(training):
+        for images, labels in loader:
+            images, labels = images.to(device), labels.to(device)
+            logits = model(images)
+            loss = criterion(logits, labels)
+            if training:
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+            total_loss += loss.item() * labels.size(0)
+            correct += (logits.argmax(1) == labels).sum().item()
+            seen += labels.size(0)
+    return total_loss / seen, correct / seen
 
 
-def train_epoch(
-    model: nn.Module,
-    loader: torch.utils.data.DataLoader,
-    criterion: nn.Module,
-    optimiser: torch.optim.Optimizer,
-    device: torch.device,
-) -> tuple[float, float]:
-    """
-    Run one training epoch.
-    Returns: (average_loss, accuracy)
-    """
-    model.train()   # enables dropout and batch normalisation in training mode
-    total_loss, correct, total = 0.0, 0, 0
-
-    for images, labels in tqdm(loader, desc="  train", leave=False):
-        images = images.to(device, non_blocking=True)
-        labels = labels.to(device, non_blocking=True)
-
-        # Zero gradients — PyTorch accumulates them by default
-        optimiser.zero_grad()
-
-        # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-
-        # Backward pass — compute gradients
-        loss.backward()
-
-        # Gradient clipping — prevents exploding gradients
-        # Clips all gradients to have norm ≤ 1.0
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-
-        # Update weights
-        optimiser.step()
-
-        total_loss += loss.item() * images.size(0)  # weighted by batch size
-        preds = outputs.argmax(dim=1)
-        correct += (preds == labels).sum().item()
-        total += labels.size(0)
-
-    return total_loss / total, correct / total
+def save_checkpoint(model: nn.Module, cfg: TrainConfig, class_names: list[str], val_acc: float) -> None:
+    """Write the checkpoint plus class_names.json (the Phase 1 -> Phase 2 contract)."""
+    cfg.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    torch.save({
+        "model_state_dict": model.state_dict(),
+        "num_classes": len(class_names),
+        "class_names": class_names,
+        "model_version": cfg.model_version,
+        "val_acc": float(val_acc),
+        "image_size": cfg.image_size,
+        "mean": list(cfg.mean),
+        "std": list(cfg.std),
+    }, cfg.checkpoint_path)
+    (cfg.checkpoint_dir / "class_names.json").write_text(json.dumps(class_names, indent=2))
 
 
-@torch.no_grad()   # disable gradient computation — saves memory and speeds up evaluation
-def eval_epoch(
-    model: nn.Module,
-    loader: torch.utils.data.DataLoader,
-    criterion: nn.Module,
-    device: torch.device,
-) -> tuple[float, float]:
-    """
-    Run one validation epoch. No gradient updates.
-    Returns: (average_loss, accuracy)
-    """
-    model.eval()    # disables dropout, uses running stats for batch norm
-    total_loss, correct, total = 0.0, 0, 0
+def fit(cfg: TrainConfig) -> dict[str, list[float]]:
+    """Full training run with early stopping. Returns the per-epoch history."""
+    set_seed(cfg.seed)
+    device = pick_device()
 
-    for images, labels in tqdm(loader, desc="  val  ", leave=False):
-        images = images.to(device, non_blocking=True)
-        labels = labels.to(device, non_blocking=True)
-        outputs = model(images)
-        loss = criterion(outputs, labels)
+    splits = split_dataset(scan_images(cfg.data_dir), cfg.val_fraction, cfg.test_fraction, cfg.seed)
+    splits.save(cfg.output_dir / "splits.json")
+    loaders = build_dataloaders(cfg, splits)
+    print(f"Device: {device} | classes: {len(splits.class_names)} | "
+          f"train/val/test: {len(splits.train)}/{len(splits.val)}/{len(splits.test)}")
 
-        total_loss += loss.item() * images.size(0)
-        correct += (outputs.argmax(1) == labels).sum().item()
-        total += labels.size(0)
+    model = build_model(len(splits.class_names), cfg.pretrained, cfg.freeze_backbone).to(device)
+    # The sampler already balances classes, so the loss is unweighted (no double correction).
+    criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
+    optimizer = torch.optim.AdamW((p for p in model.parameters() if p.requires_grad),
+                                  lr=cfg.lr, weight_decay=cfg.weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=1)
 
-    return total_loss / total, correct / total
+    history: dict[str, list[float]] = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+    best_val_loss, epochs_without_improvement = float("inf"), 0
+
+    for epoch in range(1, cfg.epochs + 1):
+        start = time.perf_counter()
+        tr_loss, tr_acc = run_epoch(model, loaders["train"], criterion, device, optimizer, cfg.freeze_backbone)
+        va_loss, va_acc = run_epoch(model, loaders["val"], criterion, device)
+        scheduler.step(va_loss)
+        for k, v in zip(history, (tr_loss, tr_acc, va_loss, va_acc), strict=True):
+            history[k].append(v)
+
+        improved = va_loss < best_val_loss
+        print(f"Epoch {epoch:2d}/{cfg.epochs} | train {tr_loss:.4f}/{tr_acc:.3f} | "
+              f"val {va_loss:.4f}/{va_acc:.3f} | {time.perf_counter() - start:.0f}s"
+              f"{'  <- best, saved' if improved else ''}")
+        if improved:
+            best_val_loss, epochs_without_improvement = va_loss, 0
+            save_checkpoint(model, cfg, splits.class_names, va_acc)
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= cfg.patience:
+                print(f"Early stopping: no val-loss improvement for {cfg.patience} epochs.")
+                break
+
+    # Imported here because evaluate.py imports pick_device from this module.
+    from crop_ml.evaluate import calibrate
+
+    calibrate(cfg.checkpoint_path, cfg.output_dir / "splits.json", num_workers=cfg.num_workers)
+    (cfg.checkpoint_dir / "history.json").write_text(json.dumps(history, indent=2))
+    (cfg.checkpoint_dir / "train_config.json").write_text(json.dumps(asdict(cfg), indent=2, default=str))
+    print(f"Best checkpoint -> {cfg.checkpoint_path}")
+    return history
 
 
-def train(
-    train_loader,
-    val_loader,
-    num_classes: int,
-    epochs: int = 15,
-    lr: float = 1e-3,
-    checkpoint_dir: str = "outputs/checkpoints",
-    model_version: str = "v1",
-) -> tuple[nn.Module, dict]:
-    """
-    Full training run with:
-    - Learning rate scheduling (cosine annealing)
-    - Best-model checkpointing (saves on validation accuracy improvement)
-    - Training history for plotting
-    """
-    Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
-    device = get_device()
-    print(f"Using device: {device}")
+def parse_args(argv: list[str] | None = None) -> TrainConfig:
+    d = TrainConfig()
+    p = argparse.ArgumentParser(description="Train the crop disease baseline model.")
+    p.add_argument("--data-dir", type=Path, default=d.data_dir)
+    p.add_argument("--output-dir", type=Path, default=d.output_dir)
+    p.add_argument("--model-version", default=d.model_version)
+    p.add_argument("--epochs", type=int, default=d.epochs)
+    p.add_argument("--batch-size", type=int, default=d.batch_size)
+    p.add_argument("--lr", type=float, default=d.lr)
+    p.add_argument("--patience", type=int, default=d.patience)
+    p.add_argument("--num-workers", type=int, default=d.num_workers)
+    p.add_argument("--no-pretrained", dest="pretrained", action="store_false",
+                   help="random init (offline tests only)")
+    p.add_argument("--unfreeze", dest="freeze_backbone", action="store_false",
+                   help="fine-tune the whole network")
+    return TrainConfig(**vars(p.parse_args(argv)))
 
-    model = build_model(num_classes).to(device)
 
-    # Cross-entropy loss — correct choice for multi-class classification
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    # label_smoothing=0.1: instead of training toward hard 0/1 targets,
-    # use 0.05/0.95 — reduces overconfidence and often improves generalisation
-
-    # Adam optimiser — adaptive learning rates per parameter
-    # Only optimise parameters with requires_grad=True (the classifier head)
-    optimiser = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=lr,
-        weight_decay=1e-4   # L2 regularisation — penalises large weights
-    )
-
-    # Cosine annealing: lr starts at `lr`, smoothly decays to near-0 over `epochs`
-    # Better than fixed lr — allows large steps early and fine-grained steps later
-    scheduler = CosineAnnealingLR(optimiser, T_max=epochs, eta_min=1e-6)
-
-    history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
-    best_val_acc = 0.0
-
-    for epoch in range(1, epochs + 1):
-        start = time.time()
-        print(f"\nEpoch {epoch}/{epochs}  (lr={scheduler.get_last_lr()[0]:.2e})")
-
-        train_loss, train_acc = train_epoch(model, train_loader, criterion, optimiser, device)
-        val_loss,   val_acc   = eval_epoch(model, val_loader, criterion, device)
-
-        scheduler.step()    # update learning rate for next epoch
-
-        elapsed = time.time() - start
-        print(f"  loss: {train_loss:.4f} → {val_loss:.4f}  "
-              f"acc: {train_acc:.3f} → {val_acc:.3f}  ({elapsed:.0f}s)")
-
-        history["train_loss"].append(train_loss)
-        history["train_acc"].append(train_acc)
-        history["val_loss"].append(val_loss)
-        history["val_acc"].append(val_acc)
-
-        # Save checkpoint if validation accuracy improved
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            ckpt_path = Path(checkpoint_dir) / f"mobilenetv2_{model_version}_best.pt"
-            torch.save({
-                "epoch":            epoch,
-                "model_state_dict": model.state_dict(),
-                "val_acc":          val_acc,
-                "model_version":    model_version,
-            }, ckpt_path)
-            print(f"  ✓ New best — saved checkpoint ({val_acc:.3f})")
-
-    print(f"\nTraining complete. Best val accuracy: {best_val_acc:.4f}")
-    return model, history
+if __name__ == "__main__":
+    fit(parse_args())
 ```
 
----
+What happens in each epoch:
 
-### 5.7 Evaluation Reporter
+```mermaid
+sequenceDiagram
+    participant L as train loop
+    participant M as model
+    participant V as val set
+    participant C as checkpoint
+    loop each epoch
+        L->>M: run_epoch(train) with sampler + augmentation
+        L->>V: run_epoch(val), no gradients
+        alt val loss improved
+            L->>C: save_checkpoint() (contract keys)
+        else no improvement for `patience` epochs
+            L-->>L: early stop
+        end
+        L->>L: ReduceLROnPlateau halves lr after 1 flat epoch
+    end
+```
 
-**File:** `src/evaluate.py`
+**Run it:**
+
+```bash
+uv run python -m crop_ml.train                    # 10 epochs max, early stopping
+uv run python -m crop_ml.train --help             # all flags
+```
+
+**Expected output** (times are for an M-series Mac using the GPU via MPS):
+
+```
+Device: mps | classes: 15 | train/val/test: <≈15.5k>/<≈3.1k>/<≈2.1k>
+Epoch  1/10 | train 0.9.../0.8.. | val 0.6.../0.9.. | 60s  <- best, saved
+...
+Best checkpoint -> outputs/checkpoints/mobilenetv2_v1_best.pt
+```
+
+Exact numbers depend on your hardware and versions; a frozen-backbone baseline typically
+reaches roughly 90%+ validation accuracy on this dataset.
+
+**The checkpoint contract** (Phase 2 depends on these exact keys):
+
+| Key | Example | Used by Phase 2 for |
+|---|---|---|
+| `model_state_dict` | weights | rebuilding the network |
+| `num_classes` | 15 | sizing the final layer |
+| `class_names` | `["Pepper__bell___Bacterial_spot", ...]` | index → label |
+| `model_version` | `"v1"` | responses, `/api/v1/models` |
+| `val_acc` | 0.93 | `/api/v1/models` |
+| `image_size`, `mean`, `std` | 224, ImageNet stats | identical preprocessing |
+
+### 6.4 Evaluation Reporter
+
+**File:** `ml-training/src/crop_ml/evaluate.py`
 
 ```python
-# src/evaluate.py
-#
-# Comprehensive model evaluation — everything beyond simple accuracy.
-# Accuracy alone is misleading on imbalanced datasets.
-# A model that always predicts "Healthy" on a 90% healthy dataset
-# achieves 90% accuracy while being completely useless.
+"""Evaluate a trained checkpoint on the held-out test split.
 
+Run (from ml-training/, after training):
+    uv run python -m crop_ml.evaluate
+    uv run python -m crop_ml.evaluate --checkpoint outputs/checkpoints/mobilenetv2_v1_best.pt
+
+Uses outputs/splits.json written by training, so the test images are exactly
+the ones the model never saw.
+
+Writes:
+    outputs/plots/confusion_matrix.png
+    outputs/eval_summary.json     accuracy, macro/weighted F1, per-class P/R/F1
+"""
+
+import argparse
+import json
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import seaborn as sns  # noqa: E402
+import torch  # noqa: E402
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix  # noqa: E402
+from torch import nn  # noqa: E402
+from torch.utils.data import DataLoader  # noqa: E402
+
+from crop_ml.config import TrainConfig  # noqa: E402
+from crop_ml.data import LeafDataset, Splits  # noqa: E402
+from crop_ml.model import build_model  # noqa: E402
+from crop_ml.threshold import ThresholdChoice, choose_threshold  # noqa: E402
+from crop_ml.train import pick_device  # noqa: E402
+from crop_ml.transforms import build_eval_transforms  # noqa: E402
+
+
+def load_checkpoint(path: Path, device: torch.device) -> tuple[nn.Module, dict]:
+    """Rebuild the model from a checkpoint. Returns (model in eval mode, checkpoint dict)."""
+    ckpt = torch.load(path, map_location=device, weights_only=True)
+    model = build_model(ckpt["num_classes"], pretrained=False, freeze_backbone=False)
+    model.load_state_dict(ckpt["model_state_dict"])
+    return model.to(device).eval(), ckpt
+
+
+@torch.inference_mode()
+def predict(model: nn.Module, loader: DataLoader, device: torch.device) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (true labels, predicted labels, top-1 confidence) for every image in `loader`."""
+    y_true, y_pred, conf = [], [], []
+    for images, labels in loader:
+        probs = torch.softmax(model(images.to(device)), dim=1)
+        top, idx = probs.max(1)
+        y_pred.append(idx.cpu().numpy())
+        conf.append(top.cpu().numpy())
+        y_true.append(labels.numpy())
+    return np.concatenate(y_true), np.concatenate(y_pred), np.concatenate(conf)
+
+
+def calibrate(checkpoint: Path, splits_path: Path, target_precision: float = 0.95, batch_size: int = 64,
+              num_workers: int = 2) -> ThresholdChoice:
+    """Choose the confidence threshold on the VALIDATION split and store it in the checkpoint."""
+    device = pick_device()
+    model, ckpt = load_checkpoint(checkpoint, device)
+    tf = build_eval_transforms(ckpt["image_size"], tuple(ckpt["mean"]), tuple(ckpt["std"]))
+    loader = DataLoader(LeafDataset(Splits.load(splits_path).val, tf), batch_size=batch_size,
+                        num_workers=num_workers)
+    y_true, y_pred, conf = predict(model, loader, device)
+    choice = choose_threshold(conf, y_true == y_pred, target_precision)
+    ckpt["confidence_threshold"] = choice.threshold
+    torch.save(ckpt, checkpoint)
+    print(f"Confidence threshold {choice.threshold:.3f}: answers {choice.coverage:.1%} of validation images "
+          f"with {choice.precision:.1%} precision")
+    return choice
+
+
+def save_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, class_names: list[str], path: Path) -> None:
+    """Row-normalised confusion matrix: each row shows where one true class went."""
+    labels = list(range(len(class_names)))
+    cm = confusion_matrix(y_true, y_pred, labels=labels, normalize="true")
+    fig, ax = plt.subplots(figsize=(max(8, len(labels) * 0.7), max(6, len(labels) * 0.6)))
+    sns.heatmap(cm, annot=True, fmt=".2f", cmap="Blues", xticklabels=class_names,
+                yticklabels=class_names, ax=ax, cbar=False)
+    ax.set(xlabel="Predicted", ylabel="True", title="Confusion matrix (row-normalised)")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _threshold_stats(threshold: float | None, y_true: np.ndarray, y_pred: np.ndarray, conf: np.ndarray) -> dict:
+    """How the stored threshold behaves on the test set (answered share and their accuracy)."""
+    if threshold is None:
+        return {}
+    kept = conf >= threshold
+    return {"confidence_threshold": threshold, "test_coverage": float(kept.mean()),
+            "test_accuracy_when_answered": float((y_true[kept] == y_pred[kept]).mean()) if kept.any() else None}
+
+
+def evaluate(checkpoint: Path, splits_path: Path, output_dir: Path, batch_size: int = 64,
+             num_workers: int = 2) -> dict:
+    """Score the checkpoint on the test split, save plots + summary, return the summary."""
+    device = pick_device()
+    model, ckpt = load_checkpoint(checkpoint, device)
+    splits = Splits.load(splits_path)
+    class_names: list[str] = ckpt["class_names"]
+
+    tf = build_eval_transforms(ckpt["image_size"], tuple(ckpt["mean"]), tuple(ckpt["std"]))
+    loader = DataLoader(LeafDataset(splits.test, tf), batch_size=batch_size, num_workers=num_workers)
+    y_true, y_pred, conf = predict(model, loader, device)
+
+    labels = list(range(len(class_names)))
+    # labels= keeps every class in the report even if one is missing from the test split;
+    # zero_division=0 avoids warnings/NaN for classes with no predictions.
+    report = classification_report(y_true, y_pred, labels=labels, target_names=class_names,
+                                   zero_division=0, output_dict=True)
+    print(classification_report(y_true, y_pred, labels=labels, target_names=class_names, zero_division=0))
+
+    save_confusion_matrix(y_true, y_pred, class_names, output_dir / "plots" / "confusion_matrix.png")
+    summary = {
+        "model_version": ckpt["model_version"],
+        "test_images": int(len(y_true)),
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "macro_f1": report["macro avg"]["f1-score"],
+        "weighted_f1": report["weighted avg"]["f1-score"],
+        **_threshold_stats(ckpt.get("confidence_threshold"), y_true, y_pred, conf),
+        "per_class": {n: {k: report[n][k] for k in ("precision", "recall", "f1-score", "support")}
+                      for n in class_names},
+    }
+    (output_dir / "eval_summary.json").write_text(json.dumps(summary, indent=2))
+    print(f"Accuracy {summary['accuracy']:.3f} | macro F1 {summary['macro_f1']:.3f} "
+          f"-> {output_dir / 'eval_summary.json'}")
+    return summary
+
+
+if __name__ == "__main__":
+    d = TrainConfig()
+    p = argparse.ArgumentParser(description="Evaluate a checkpoint on the test split.")
+    p.add_argument("--checkpoint", type=Path, default=d.checkpoint_path)
+    p.add_argument("--splits", type=Path, default=d.output_dir / "splits.json")
+    p.add_argument("--output-dir", type=Path, default=d.output_dir)
+    p.add_argument("--num-workers", type=int, default=d.num_workers)
+    a = p.parse_args()
+    evaluate(a.checkpoint, a.splits, a.output_dir, num_workers=a.num_workers)
+```
+
+**Run it:**
+
+```bash
+uv run python -m crop_ml.evaluate
+```
+
+It prints scikit-learn's per-class precision / recall / F1 table, then
+`Accuracy 0.9.. | macro F1 0.9.. -> outputs/eval_summary.json`, and saves
+`outputs/plots/confusion_matrix.png`. Read the confusion matrix row by row: each row is a
+true class, and off-diagonal cells show what it gets mistaken for (often tomato diseases
+for each other).
+
+### 6.5 Tests
+
+The tests build a tiny fake dataset (3 classes, mixed `.jpg`/`.JPG`, one `__` folder) so they
+run in seconds without the real data.
+
+**File:** `ml-training/tests/conftest.py`
+
+```python
+"""Shared fixtures: a tiny synthetic PlantVillage-style dataset (no download needed)."""
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+from PIL import Image
+
+# Folder names mimic the real dataset, including the "__" variant and mixed-case extensions.
+CLASSES = {
+    "Pepper__bell___Bacterial_spot": 24,
+    "Potato___healthy": 12,
+    "Tomato__Target_Spot": 30,
+}
+
+
+@pytest.fixture(scope="session")
+def tiny_dataset(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    root = tmp_path_factory.mktemp("plantvillage")
+    rng = np.random.default_rng(0)
+    for i, (name, n) in enumerate(CLASSES.items()):
+        d = root / name
+        d.mkdir()
+        for j in range(n):
+            # Each class has a distinct base colour so a model can actually learn it.
+            arr = np.full((64, 80, 3), 60 * (i + 1), dtype=np.uint8)
+            arr = (arr + rng.integers(0, 40, arr.shape)).astype(np.uint8)
+            ext = ".JPG" if j % 2 else ".jpg"
+            Image.fromarray(arr).save(d / f"img_{j}{ext}", format="JPEG")
+        (d / "notes.txt").write_text("not an image")
+    return root
+```
+
+**File:** `ml-training/tests/test_data.py`
+
+```python
+import pytest
+import torch
+
+from crop_ml.config import TrainConfig
+from crop_ml.data import (
+    build_dataloaders,
+    make_balanced_sampler,
+    parse_class_name,
+    scan_images,
+    split_dataset,
+)
+
+from .conftest import CLASSES
+
+
+@pytest.mark.parametrize(("folder", "expected"), [
+    ("Pepper__bell___Bacterial_spot", ("Pepper bell", "Bacterial spot")),
+    ("Potato___Early_blight", ("Potato", "Early blight")),
+    ("Tomato__Target_Spot", ("Tomato", "Target Spot")),
+    ("Tomato__Tomato_YellowLeaf__Curl_Virus", ("Tomato", "Tomato YellowLeaf Curl Virus")),
+    ("Tomato_Bacterial_spot", ("Tomato", "Bacterial spot")),
+    ("Tomato_healthy", ("Tomato", "healthy")),
+])
+def test_parse_class_name(folder, expected):
+    assert parse_class_name(folder) == expected
+
+
+def test_scan_counts_mixed_case_extensions_and_skips_non_images(tiny_dataset):
+    df = scan_images(tiny_dataset)
+    assert len(df) == sum(CLASSES.values())
+    assert sorted(df["class_name"].unique()) == sorted(CLASSES)
+
+
+def test_folders_without_images_are_not_classes(tiny_dataset, tmp_path):
+    import shutil
+
+    root = tmp_path / "pv"
+    shutil.copytree(tiny_dataset, root)
+    (root / "PlantVillage" / "nested").mkdir(parents=True)  # like the duplicate folder in the Kaggle zip
+    df = scan_images(root)
+    assert sorted(df["class_name"].unique()) == sorted(CLASSES)
+    assert sorted(df["label"].unique()) == list(range(len(CLASSES)))  # no gaps in label indices
+
+
+def test_split_is_disjoint_and_stratified(tiny_dataset):
+    s = split_dataset(scan_images(tiny_dataset), 0.15, 0.10, seed=42)
+    paths = [set(x["path"]) for x in (s.train, s.val, s.test)]
+    assert not (paths[0] & paths[1] or paths[0] & paths[2] or paths[1] & paths[2])
+    assert sum(len(p) for p in paths) == sum(CLASSES.values())
+    for part in (s.val, s.test):  # every class present in the small splits too
+        assert part["label"].nunique() == len(CLASSES)
+
+
+def test_split_round_trips_through_json(tiny_dataset, tmp_path):
+    s = split_dataset(scan_images(tiny_dataset), 0.15, 0.10, seed=42)
+    s.save(tmp_path / "splits.json")
+    loaded = type(s).load(tmp_path / "splits.json")
+    assert loaded.test["path"].tolist() == s.test["path"].tolist()
+    assert loaded.class_names == s.class_names
+
+
+def test_sampler_only_indexes_train_set():
+    labels = [0] * 90 + [1] * 10
+    idx = list(make_balanced_sampler(labels))
+    assert max(idx) < len(labels)
+    share_rare = sum(labels[i] == 1 for i in idx) / len(idx)
+    assert 0.3 < share_rare < 0.7  # rare class drawn about as often as the common one
+
+
+def test_train_loader_augments_and_eval_loader_does_not(tiny_dataset):
+    cfg = TrainConfig(data_dir=tiny_dataset, image_size=32, batch_size=4, num_workers=0)
+    loaders = build_dataloaders(cfg, split_dataset(scan_images(tiny_dataset), 0.15, 0.10, 42))
+    ds_train, ds_val = loaders["train"].dataset, loaders["val"].dataset
+    assert ds_train.transform is not ds_val.transform
+    images, _ = next(iter(loaders["val"]))
+    assert images.shape[1:] == (3, 32, 32) and images.dtype == torch.float32
+    # Same val image twice -> identical; same train image twice -> differs (random augmentation).
+    assert torch.equal(ds_val[0][0], ds_val[0][0])
+    assert not torch.equal(ds_train[0][0], ds_train[0][0])
+```
+
+**File:** `ml-training/tests/test_training.py`
+
+```python
+"""End-to-end smoke test: train 2 epochs on the tiny dataset, then evaluate."""
+
+import json
+
+import torch
+
+from crop_ml.config import TrainConfig
+from crop_ml.evaluate import evaluate
+from crop_ml.mismatch import run as mismatch_run
+from crop_ml.model import build_model
+from crop_ml.theory.gradient_descent import generate_data, train
+from crop_ml.train import fit
+
+from .conftest import CLASSES
+
+CONTRACT_KEYS = {"model_state_dict", "num_classes", "class_names", "model_version",
+                 "val_acc", "image_size", "mean", "std", "confidence_threshold"}
+
+
+def test_model_outputs_one_logit_per_class():
+    model = build_model(5, pretrained=False).eval()
+    assert model(torch.zeros(2, 3, 64, 64)).shape == (2, 5)
+
+
+def test_frozen_backbone_trains_only_head():
+    model = build_model(3, pretrained=False, freeze_backbone=True)
+    trainable = {n for n, p in model.named_parameters() if p.requires_grad}
+    assert trainable == {"classifier.1.weight", "classifier.1.bias"}
+
+
+def test_gradient_descent_recovers_true_line():
+    w, b, losses = train(*generate_data(), lr=0.05, epochs=200, verbose=False)
+    assert abs(w - 3) < 0.15 and abs(b - 2) < 0.15 and losses[-1] < losses[0]
+
+
+def test_fit_then_evaluate_writes_contract_artifacts(tiny_dataset, tmp_path):
+    cfg = TrainConfig(data_dir=tiny_dataset, output_dir=tmp_path, image_size=32, batch_size=8,
+                      epochs=2, num_workers=0, pretrained=False)
+    history = fit(cfg)
+    assert len(history["val_loss"]) >= 1
+
+    ckpt = torch.load(cfg.checkpoint_path, weights_only=True)
+    assert CONTRACT_KEYS <= ckpt.keys()
+    assert ckpt["class_names"] == sorted(CLASSES)
+    assert json.loads((cfg.checkpoint_dir / "class_names.json").read_text()) == sorted(CLASSES)
+
+    summary = evaluate(cfg.checkpoint_path, tmp_path / "splits.json", tmp_path, num_workers=0)
+    assert set(summary["per_class"]) == set(CLASSES)
+    assert (tmp_path / "plots" / "confusion_matrix.png").exists()
+    assert 0.5 <= ckpt["confidence_threshold"] <= 1.0
+    assert "test_coverage" in summary
+
+    results = mismatch_run(cfg.checkpoint_path, tmp_path / "splits.json", tmp_path / "mismatch.json", num_workers=2)
+    assert set(results) == {"correct", "stretch", "no_scale", "bgr"}
+```
+
+### 6.6 Notebooks (portfolio output)
+
+| Notebook | What it shows | Needs dataset |
+|---|---|---|
+| `01_gradient_descent.ipynb` | fitted line, loss curve, learning-rate comparison, loss table | no |
+| `02_plantvillage_eda.ipynb` | class table, `info()`/`describe()`, pivot, plots | yes |
+| `03_baseline_model.ipynb` | training, history curves, test evaluation, confusion matrix | yes |
+
+Each notebook starts with `os.chdir('..')` so paths resolve from `ml-training/`, and uses
+`num_workers=0` (the safest choice inside Jupyter on macOS). Commit them **with outputs**
+so GitHub shows the plots.
+
+### 6.7 Confidence Threshold: Knowing When Not to Answer
+
+The classifier always picks one of its classes, even for a blurry or unrelated photo. After
+training, `calibrate()` (in `evaluate.py`) picks the lowest confidence that keeps
+**≥ 95% precision on the validation set** (never below 0.5) and stores it in the checkpoint as
+`confidence_threshold`. The API and the phone both read it from there, so they agree.
+
+**File:** `ml-training/src/crop_ml/threshold.py`
+
+```python
+"""Pick the confidence threshold below which the app says "retake photo" instead of guessing.
+
+Rule: the lowest threshold t (never below `floor`) such that predictions with
+confidence >= t are correct at least `target_precision` of the time on the
+VALIDATION set. Lower t keeps more predictions (coverage); higher t keeps fewer,
+more reliable ones.
+
+The threshold is stored in the checkpoint as `confidence_threshold`, so the
+Phase 2 service and the phone apply exactly the same rule.
+
+Limitation: this guards against low-confidence mistakes on potato leaves. A photo
+of something that is not a potato leaf can still get high confidence; the
+threshold reduces that risk but does not remove it.
+"""
+
+from dataclasses import dataclass
+
+import numpy as np
+
+
+@dataclass(frozen=True)
+class ThresholdChoice:
+    threshold: float
+    coverage: float  # share of validation images that would get an answer
+    precision: float  # accuracy on those answered images
+
+
+def choose_threshold(confidences: np.ndarray, correct: np.ndarray,
+                     target_precision: float = 0.95, floor: float = 0.5) -> ThresholdChoice:
+    """Lowest threshold >= floor whose accepted predictions reach target_precision.
+
+    confidences: top-1 softmax probability per image; correct: bool per image.
+    Falls back to the most selective candidate if the target can't be reached.
+    """
+    if len(confidences) == 0:
+        raise ValueError("Need at least one validation prediction")
+    candidates = np.unique(np.concatenate([[floor], confidences[confidences >= floor]]))
+    best = None
+    for t in candidates:  # ascending: first hit is the lowest qualifying threshold
+        kept = confidences >= t
+        if not kept.any():
+            continue
+        precision = float(correct[kept].mean())
+        best = ThresholdChoice(float(t), float(kept.mean()), precision)
+        if precision >= target_precision:
+            return best
+    return best or ThresholdChoice(float(floor), 0.0, 0.0)
+```python
+```
+
+**Run it:** `uv run python -m crop_ml.mismatch`
+
+**Result (potato model v1, 216 test images):**
+
+| Variant | Accuracy | Still answered (≥ threshold) | Predictions [early, late, healthy] |
+|---|---|---|---|
+| correct | 95.8% | 96.3% | [97, 101, 18] |
+| stretch to 224×224 | 97.7% | 97.2% | [101, 97, 18] |
+| forgot ÷255 | **9.3%** | **91.2%** | [1, 5, 210] |
+| red/blue swapped | **55.6%** | **88.9%** | [9, 180, 27] |
+
+- **Forgetting ÷255 makes almost every leaf "healthy"**, confidently. That is the worst possible
+  failure for a farmer, and nothing crashes.
+- Swapped channels push most leaves to "late blight".
+- Stretching did no harm here only because PlantVillage photos are already square (256×256);
+  phone photos are not, so measure it again with real camera images.
+- The confidence threshold does not catch any of these: broken inputs still produce confident outputs.
+
+### 6.8 The Silent Failure: Preprocessing Mismatch
+
+The phone must prepare images exactly like training did. `mismatch.py` scores the test set with the
+correct pipeline and three realistic bugs a Dart port could contain.
+
+**File:** `ml-training/src/crop_ml/mismatch.py`
+
+```python
+"""What a preprocessing mismatch does to accuracy: the "silent failure" experiment.
+
+The phone must prepare images exactly like training did. Each variant below is a
+realistic bug in a Dart port; the model still returns confident-looking answers,
+only the accuracy drops. Nothing crashes, which is why this failure is silent.
+
+Run (from ml-training/, after training):
+    uv run python -m crop_ml.mismatch
+
+Variants:
+    correct          Resize short side to 256 -> centre crop 224 -> /255 -> normalise
+    stretch          Resize straight to 224x224 (aspect ratio distorted, no crop)
+    no_scale         Forget /255: pixel values 0..255 reach the network
+    bgr              Red and blue channels swapped (common with camera/OpenCV buffers)
+"""
+
+import argparse
 import json
 from pathlib import Path
 
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    precision_recall_fscore_support,
-    roc_auc_score,
-)
-from tqdm import tqdm
+from torch.utils.data import DataLoader
+from torchvision.transforms import v2 as T
+
+from crop_ml.config import TrainConfig
+from crop_ml.data import LeafDataset, Splits
+from crop_ml.evaluate import load_checkpoint, predict
+from crop_ml.train import pick_device
 
 
-@torch.no_grad()
-def collect_predictions(
-    model: torch.nn.Module,
-    loader: torch.utils.data.DataLoader,
-    device: torch.device,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Run model over the entire loader and collect predictions.
-    Returns: (all_labels, all_predictions, all_probabilities)
-    """
-    model.eval()
-    all_labels, all_preds, all_probs = [], [], []
-
-    for images, labels in tqdm(loader, desc="Evaluating"):
-        images = images.to(device)
-        outputs = model(images)
-
-        # Softmax converts raw logits to probabilities
-        probs = torch.softmax(outputs, dim=1)
-        preds = probs.argmax(dim=1)
-
-        all_labels.extend(labels.numpy())
-        all_preds.extend(preds.cpu().numpy())
-        all_probs.extend(probs.cpu().numpy())
-
-    return (
-        np.array(all_labels),
-        np.array(all_preds),
-        np.array(all_probs),
-    )
+def swap_red_blue(x: torch.Tensor) -> torch.Tensor:
+    """RGB -> BGR. A named function (not a lambda) so DataLoader worker processes can pickle it."""
+    return x[[2, 1, 0]]
 
 
-def evaluate(
-    model: torch.nn.Module,
-    loader: torch.utils.data.DataLoader,
-    class_names: list[str],
-    device: torch.device,
-    save_dir: str = "outputs/plots",
-) -> dict:
-    """
-    Full evaluation suite:
-    1. Per-class precision, recall, F1
-    2. Confusion matrix heatmap
-    3. Top-5 best and worst performing classes
-    4. JSON summary saved to disk
-    """
-    Path(save_dir).mkdir(parents=True, exist_ok=True)
-
-    labels, preds, probs = collect_predictions(model, loader, device)
-
-    # ── 1. Classification report ──────────────────────────────────────────
-    print("\n" + "─" * 60)
-    print("PER-CLASS METRICS")
-    print("─" * 60)
-    report = classification_report(labels, preds, target_names=class_names, digits=3)
-    print(report)
-
-    # ── 2. Per-class metrics as structured data ───────────────────────────
-    precision, recall, f1, support = precision_recall_fscore_support(
-        labels, preds, average=None
-    )
-    metrics_df_data = {
-        "class":     class_names,
-        "precision": precision.tolist(),
-        "recall":    recall.tolist(),
-        "f1":        f1.tolist(),
-        "support":   support.tolist(),
+def variants(size: int, mean: list[float], std: list[float]) -> dict[str, T.Compose]:
+    norm = T.Normalize(mean, std)
+    to_float = [T.ToImage(), T.ToDtype(torch.float32, scale=True)]
+    crop = [T.Resize(int(size * 256 / 224)), T.CenterCrop(size)]
+    return {
+        "correct": T.Compose([*crop, *to_float, norm]),
+        "stretch": T.Compose([T.Resize((size, size)), *to_float, norm]),
+        # scale=False keeps 0..255 values, exactly what a missing "/ 255.0" in Dart produces
+        "no_scale": T.Compose([*crop, T.ToImage(), T.ToDtype(torch.float32, scale=False), norm]),
+        "bgr": T.Compose([*crop, *to_float, T.Lambda(swap_red_blue), norm]),
     }
 
-    # ── 3. Confusion matrix heatmap ───────────────────────────────────────
-    cm = confusion_matrix(labels, preds)
-    # Normalise rows so each row sums to 1 — shows per-class recall clearly
-    cm_norm = cm.astype(float) / cm.sum(axis=1, keepdims=True)
 
-    short_names = [c.split("___")[-1].replace("_", " ")[:20] for c in class_names]
+def run(checkpoint: Path, splits_path: Path, out: Path, num_workers: int = 2) -> dict[str, dict]:
+    device = pick_device()
+    model, ckpt = load_checkpoint(checkpoint, device)
+    test = Splits.load(splits_path).test
+    threshold = ckpt.get("confidence_threshold")
+    results = {}
+    for name, tf in variants(ckpt["image_size"], ckpt["mean"], ckpt["std"]).items():
+        loader = DataLoader(LeafDataset(test, tf), batch_size=64, num_workers=num_workers)
+        y_true, y_pred, conf = predict(model, loader, device)
+        results[name] = {
+            "accuracy": float((y_true == y_pred).mean()),
+            "mean_confidence": float(conf.mean()),
+            # Share of images the app would still answer (confident) even though the input is broken
+            "answered": float((conf >= threshold).mean()) if threshold is not None else None,
+            "predicted_class_counts": np.bincount(y_pred, minlength=ckpt["num_classes"]).tolist(),
+        }
+    out.write_text(json.dumps({"class_names": ckpt["class_names"], "threshold": threshold,
+                               "results": results}, indent=2))
+    print(f"{'variant':10s} {'accuracy':>9s} {'mean conf':>10s} {'answered':>9s}  predictions per class")
+    for name, r in results.items():
+        answered = f"{r['answered']:.1%}" if r["answered"] is not None else "-"
+        print(f"{name:10s} {r['accuracy']:9.1%} {r['mean_confidence']:10.2f} {answered:>9s}  "
+              f"{r['predicted_class_counts']}")
+    print(f"\nclasses: {ckpt['class_names']}\nSaved -> {out}")
+    return results
 
-    fig, ax = plt.subplots(figsize=(18, 16))
-    sns.heatmap(
-        cm_norm,
-        annot=True,
-        fmt=".2f",
-        cmap="Blues",
-        xticklabels=short_names,
-        yticklabels=short_names,
-        ax=ax,
-        linewidths=0.3,
-    )
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("True")
-    ax.set_title("Normalised Confusion Matrix\n(cell value = fraction of true class predicted as column class)")
-    plt.xticks(rotation=45, ha="right", fontsize=7)
-    plt.yticks(rotation=0, fontsize=7)
-    plt.tight_layout()
-    plt.savefig(f"{save_dir}/confusion_matrix.png", dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"Saved confusion matrix → {save_dir}/confusion_matrix.png")
 
-    # ── 4. Best and worst classes ─────────────────────────────────────────
-    class_f1 = list(zip(class_names, f1.tolist()))
-    best  = sorted(class_f1, key=lambda x: x[1], reverse=True)[:5]
-    worst = sorted(class_f1, key=lambda x: x[1])[:5]
-
-    print("\nTop 5 BEST performing classes:")
-    for name, score in best:
-        print(f"  {score:.3f}  {name}")
-
-    print("\nTop 5 WORST performing classes (focus area for improvement):")
-    for name, score in worst:
-        print(f"  {score:.3f}  {name}")
-
-    # ── 5. Overall accuracy ───────────────────────────────────────────────
-    overall_acc = (labels == preds).mean()
-    macro_f1 = f1.mean()
-    print(f"\nOverall accuracy: {overall_acc:.4f}")
-    print(f"Macro F1:         {macro_f1:.4f}")
-    print("─" * 60)
-
-    # ── 6. Save summary to JSON ───────────────────────────────────────────
-    summary = {
-        "overall_accuracy": float(overall_acc),
-        "macro_f1":         float(macro_f1),
-        "per_class":        metrics_df_data,
-        "best_5_classes":   best,
-        "worst_5_classes":  worst,
-    }
-    summary_path = Path(save_dir).parent / "eval_summary.json"
-    with open(summary_path, "w") as f:
-        json.dump(summary, f, indent=2)
-    print(f"Saved evaluation summary → {summary_path}")
-
-    return summary
+if __name__ == "__main__":
+    d = TrainConfig()
+    p = argparse.ArgumentParser(description="Measure accuracy under preprocessing mismatches.")
+    p.add_argument("--checkpoint", type=Path, default=d.checkpoint_path)
+    p.add_argument("--splits", type=Path, default=d.output_dir / "splits.json")
+    p.add_argument("--out", type=Path, default=d.output_dir / "mismatch.json")
+    p.add_argument("--num-workers", type=int, default=d.num_workers)
+    a = p.parse_args()
+    run(a.checkpoint, a.splits, a.out, a.num_workers)
 ```
 
----
+**Run it:** `uv run python -m crop_ml.mismatch`
 
-## 6. Portfolio Output — Jupyter Notebook
+**Result (potato model v1, 216 test images):**
 
-**File:** `notebooks/03_baseline_model.ipynb`
+| Variant | Accuracy | Still answered (≥ threshold) | Predictions [early, late, healthy] |
+|---|---|---|---|
+| correct | 95.8% | 96.3% | [97, 101, 18] |
+| stretch to 224×224 | 97.7% | 97.2% | [101, 97, 18] |
+| forgot ÷255 | **9.3%** | **91.2%** | [1, 5, 210] |
+| red/blue swapped | **55.6%** | **88.9%** | [9, 180, 27] |
 
-This is the most important notebook. It ties everything together and is the
-artefact you show in interviews. Each cell below is one notebook cell.
+- **Forgetting ÷255 makes almost every leaf "healthy"**, confidently. That is the worst possible
+  failure for a farmer, and nothing crashes.
+- Swapped channels push most leaves to "late blight".
+- Stretching did no harm here only because PlantVillage photos are already square (256×256);
+  phone photos are not, so measure it again with real camera images.
+- The confidence threshold does not catch any of these: broken inputs still produce confident outputs.
+
+### 6.9 Potato Demo (used in the presentation)
+
+The presentation uses only the 3 potato classes (2,152 images: early blight 1,000, late blight 1,000,
+healthy 152, a 6.6× imbalance). No code changes, just a different data folder:
+
+```bash
+mkdir -p data/potato
+for c in Potato___Early_blight Potato___Late_blight Potato___healthy; do
+  ln -sfn "$PWD/data/PlantVillage/$c" "data/potato/$c"   # links, no copying
+done
+uv run python -m crop_ml.eda --data-dir data/potato --metadata-csv data/potato_metadata.csv
+uv run python -m crop_ml.train --data-dir data/potato     # ~40 s on an M-series Mac
+uv run python -m crop_ml.evaluate
+uv run python -m crop_ml.mismatch
+```
+
+Results: test accuracy **95.8%**, macro F1 **0.945**. Per class (precision / recall):
+early blight 0.99 / 0.95, late blight 0.95 / 0.96, healthy 0.83 / 1.00. A few blighted leaves are
+called healthy, which is the costly direction for a farmer.
+
+**Field photos (the honest number).** The same model on 221 potato photos from
+[PlantDoc](https://github.com/pratikkayal/PlantDoc-Dataset) (field images, CC BY 4.0;
+it has early and late blight, no healthy class):
+
+**File:** `ml-training/src/crop_ml/field_eval.py`
 
 ```python
-# Cell 1 — Setup
-import sys
-sys.path.insert(0, "..")   # allow importing from src/
+"""How does the lab-trained model do on real field photos?
 
-import torch
-import matplotlib.pyplot as plt
-from src.transforms import get_train_transforms, get_val_transforms
-from src.dataset   import create_dataloaders
-from src.train     import train, get_device
-from src.evaluate  import evaluate
+PlantVillage (training data) shows single leaves on plain backgrounds. PlantDoc
+(Singh et al., 2020, CC BY 4.0) has photos taken in the field: whole plants, soil,
+shadows, several leaves. This scores the potato model on PlantDoc's potato images
+with the correct preprocessing, so the only thing that changes is the photos.
+
+PlantDoc has no healthy-potato class, so this measures the two blights only, and
+reports how often a diseased field leaf is called "healthy" (the costly mistake).
+
+Get the data (only the potato folders, ~500 images) into data/plantdoc/{train,test}/<class>/,
+then run (from ml-training/):
+    uv run python -m crop_ml.field_eval
+Writes outputs/field_eval.json.
+"""
+
+import argparse
 import json
+from pathlib import Path
 
-print(f"PyTorch version: {torch.__version__}")
-print(f"Device: {get_device()}")
+import numpy as np
+import pandas as pd
+from torch.utils.data import DataLoader
+
+from crop_ml.config import TrainConfig
+from crop_ml.data import IMAGE_EXTENSIONS, LeafDataset
+from crop_ml.evaluate import load_checkpoint, predict
+from crop_ml.train import pick_device
+from crop_ml.transforms import build_eval_transforms
+
+# PlantDoc folder name -> our class name (the model's label)
+PLANTDOC_TO_OURS = {
+    "Potato leaf early blight": "Potato___Early_blight",
+    "Potato leaf late blight": "Potato___Late_blight",
+}
+
+
+def scan_plantdoc(root: Path, class_names: list[str]) -> pd.DataFrame:
+    """All mapped images under root/<split>/<PlantDoc class>/ with our integer labels."""
+    rows = []
+    for split_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for folder, ours in PLANTDOC_TO_OURS.items():
+            for f in sorted((split_dir / folder).glob("*")) if (split_dir / folder).is_dir() else []:
+                if f.suffix.lower() in IMAGE_EXTENSIONS:
+                    rows.append({"path": str(f), "label": class_names.index(ours), "class_name": ours})
+    if not rows:
+        raise FileNotFoundError(f"No PlantDoc potato images under {root}")
+    return pd.DataFrame(rows)
+
+
+def run(checkpoint: Path, root: Path, out: Path, num_workers: int = 2) -> dict:
+    device = pick_device()
+    model, ckpt = load_checkpoint(checkpoint, device)
+    names: list[str] = ckpt["class_names"]
+    df = scan_plantdoc(root, names)
+    tf = build_eval_transforms(ckpt["image_size"], tuple(ckpt["mean"]), tuple(ckpt["std"]))
+    y_true, y_pred, conf = predict(model, DataLoader(LeafDataset(df, tf), batch_size=64,
+                                                     num_workers=num_workers), device)
+    threshold = float(ckpt.get("confidence_threshold", 0.5))
+    kept = conf >= threshold
+    healthy = names.index("Potato___healthy") if "Potato___healthy" in names else -1
+
+    per_class = {}
+    for name in PLANTDOC_TO_OURS.values():
+        idx = names.index(name)
+        mask = y_true == idx
+        per_class[name] = {
+            "images": int(mask.sum()),
+            "recall": float((y_pred[mask] == idx).mean()),
+            "called_healthy": float((y_pred[mask] == healthy).mean()),
+            "predicted_counts": np.bincount(y_pred[mask], minlength=len(names)).tolist(),
+        }
+    summary = {
+        "images": int(len(y_true)),
+        "accuracy": float((y_true == y_pred).mean()),
+        "called_healthy": float((y_pred == healthy).mean()),
+        "confidence_threshold": threshold,
+        "answered": float(kept.mean()),
+        "accuracy_when_answered": float((y_true[kept] == y_pred[kept]).mean()) if kept.any() else None,
+        "mean_confidence": float(conf.mean()),
+        "per_class": per_class,
+        "class_names": names,
+    }
+    out.write_text(json.dumps(summary, indent=2))
+    print(f"PlantDoc potato field photos: {summary['images']}")
+    print(f"accuracy {summary['accuracy']:.1%} | diseased leaves called healthy {summary['called_healthy']:.1%} | "
+          f"answered at threshold {summary['answered']:.1%}, of those correct "
+          f"{summary['accuracy_when_answered'] or 0:.1%} | mean confidence {summary['mean_confidence']:.2f}")
+    for name, r in per_class.items():
+        print(f"  {name:24s} n={r['images']:3d} recall {r['recall']:.1%} called healthy {r['called_healthy']:.1%} "
+              f"predictions {r['predicted_counts']}")
+    print(f"Saved -> {out}")
+    return summary
+
+
+if __name__ == "__main__":
+    d = TrainConfig()
+    p = argparse.ArgumentParser(description="Score the model on PlantDoc field photos.")
+    p.add_argument("--checkpoint", type=Path, default=d.checkpoint_path)
+    p.add_argument("--plantdoc-dir", type=Path, default=Path("data/plantdoc"))
+    p.add_argument("--out", type=Path, default=d.output_dir / "field_eval.json")
+    p.add_argument("--num-workers", type=int, default=d.num_workers)
+    a = p.parse_args()
+    run(a.checkpoint, a.plantdoc_dir, a.out, a.num_workers)
 ```
 
-```python
-# Cell 2 — Load data
-DATA_ROOT = "../data/plantvillage/PlantVillage"
+| | Lab (PlantVillage test) | Field (PlantDoc) |
+|---|---|---|
+| Accuracy | 95.8% | **54.8%** |
+| Early blight recall | 95% | **38.8%** (71 of 116 called late blight) |
+| Late blight recall | 96% | 72.4% |
+| Answered at the 0.5 threshold | 96.3% (97.1% correct) | 86.0% (**55.3%** correct) |
+| Diseased leaf called "healthy" | n/a | 0.9% |
 
-train_loader, val_loader, test_loader, class_names = create_dataloaders(
-    data_root       = DATA_ROOT,
-    train_transforms= get_train_transforms(),
-    val_transforms  = get_val_transforms(),
-    val_split       = 0.15,
-    test_split      = 0.10,
-    batch_size      = 32,
-    use_weighted_sampler=True,
-)
+The model still recognises that a field leaf is diseased, but it cannot tell the two blights apart,
+and the confidence threshold does not catch this. Lab accuracy says little about field accuracy.
+Fixing it needs field photos in training (e.g. PlantDoc's train split), stronger augmentation
+(backgrounds, lighting, blur), and fine-tuning the whole network.
 
-print(f"Classes: {len(class_names)}")
-print(f"Sample class names: {class_names[:5]}")
-```
+### 6.10 Hand-off to Phase 2
 
-```python
-# Cell 3 — Visualise one batch to verify the pipeline
-images, labels = next(iter(train_loader))
-print(f"Batch shape: {images.shape}")   # should be [32, 3, 224, 224]
-print(f"Label range: {labels.min()} – {labels.max()}")
-
-# Visualise a few augmented images
-from src.transforms import denormalise
-import torchvision.utils as vutils
-
-grid = vutils.make_grid(denormalise(images[:8]), nrow=4, padding=4)
-plt.figure(figsize=(12, 6))
-plt.imshow(grid.permute(1, 2, 0).numpy())
-plt.title("Augmented training images (what the model sees)")
-plt.axis("off")
-plt.savefig("../outputs/plots/training_batch_sample.png", dpi=150, bbox_inches="tight")
-plt.show()
-```
-
-```python
-# Cell 4 — Train the model
-# On an M5 MacBook this takes approximately 5–10 minutes per epoch
-# with MPS acceleration. Set epochs=5 for a quick first run.
-
-model, history = train(
-    train_loader  = train_loader,
-    val_loader    = val_loader,
-    num_classes   = len(class_names),
-    epochs        = 10,
-    lr            = 1e-3,
-    checkpoint_dir= "../outputs/checkpoints",
-    model_version = "v1",
-)
-```
-
-```python
-# Cell 5 — Plot training history
-fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-
-axes[0].plot(history["train_loss"], label="Train", color="steelblue")
-axes[0].plot(history["val_loss"],   label="Val",   color="tomato")
-axes[0].set_title("Loss over epochs")
-axes[0].set_xlabel("Epoch")
-axes[0].set_ylabel("Cross-entropy loss")
-axes[0].legend()
-
-axes[1].plot(history["train_acc"], label="Train", color="steelblue")
-axes[1].plot(history["val_acc"],   label="Val",   color="tomato")
-axes[1].set_title("Accuracy over epochs")
-axes[1].set_xlabel("Epoch")
-axes[1].set_ylabel("Accuracy")
-axes[1].legend()
-
-# Watch for the gap between train and val accuracy — a growing gap means overfitting
-plt.tight_layout()
-plt.savefig("../outputs/plots/training_history.png", dpi=150, bbox_inches="tight")
-plt.show()
-```
-
-```python
-# Cell 6 — Load best checkpoint and evaluate on TEST set
-# Load the best model saved during training (highest val accuracy)
-device = get_device()
-ckpt = torch.load("../outputs/checkpoints/mobilenetv2_v1_best.pt", map_location=device)
-
-from torchvision import models
-import torch.nn as nn
-
-best_model = models.mobilenet_v2(weights=None)   # no pretrained weights — we load our own
-best_model.classifier[1] = nn.Linear(best_model.last_channel, len(class_names))
-best_model.load_state_dict(ckpt["model_state_dict"])
-best_model = best_model.to(device)
-
-print(f"Loaded checkpoint from epoch {ckpt['epoch']} (val_acc={ckpt['val_acc']:.4f})")
-
-# Evaluate on test set — this is the honest number you report
-summary = evaluate(best_model, test_loader, class_names, device)
-```
-
-```python
-# Cell 7 — Save class names alongside the model for Phase 2
-with open("../data/class_names.json", "w") as f:
-    json.dump(class_names, f, indent=2)
-
-print(f"Saved {len(class_names)} class names → data/class_names.json")
-print(f"\nPhase 1 complete.")
-print(f"Best test accuracy: {summary['overall_accuracy']:.4f}")
-print(f"Macro F1 score:     {summary['macro_f1']:.4f}")
-print(f"\nArtefacts produced:")
-print(f"  outputs/plots/class_distribution.png")
-print(f"  outputs/plots/training_history.png")
-print(f"  outputs/plots/confusion_matrix.png")
-print(f"  outputs/checkpoints/mobilenetv2_v1_best.pt")
-print(f"  outputs/eval_summary.json")
-print(f"  data/class_names.json")
+```bash
+cp outputs/checkpoints/mobilenetv2_v1_best.pt outputs/checkpoints/class_names.json \
+   ../python-ml-service/models/
 ```
 
 ---
@@ -1672,10 +2067,12 @@ specific code you wrote this phase.
 > "In my implementation, I computed the gradient of MSE loss with respect to
 > each parameter manually using calculus — `dL/dw = 2 * mean(X * error)`. Then
 > updated `w -= lr * dw`. I experimented with learning rates of 0.001, 0.05,
-> and 0.5 and observed that 0.5 caused the loss to oscillate rather than
-> converge, which is the classic learning rate too large problem."
+> 0.5 and 1.05. 0.001 barely moved, 0.05 converged smoothly, 0.5 converged
+> fastest, and 1.05 diverged: each step overshot the minimum by more than the
+> last. For MSE the stable limit is lr < 2 / curvature, which is about 1.0 for
+> this data, so that is exactly where it broke."
 
-*Reference: `src/gradient_descent.py`, `src/lr_experiment.py`*
+*Reference: `crop_ml/theory/gradient_descent.py`, `crop_ml/theory/lr_experiment.py`*
 
 ---
 
@@ -1692,10 +2089,10 @@ specific code you wrote this phase.
 
 > "I also added label smoothing of 0.1. Instead of training toward hard 0/1
 > targets, the model trains toward 0.05/0.95, which reduces overconfidence and
-> often improves generalisation — especially useful with 38 classes where some
+> often improves generalisation — especially useful with 15 classes where some
 > diseases look very similar."
 
-*Reference: `src/train.py` — `CrossEntropyLoss(label_smoothing=0.1)`*
+*Reference: `crop_ml/train.py` — `CrossEntropyLoss(label_smoothing=0.1)`*
 
 ---
 
@@ -1703,18 +2100,20 @@ specific code you wrote this phase.
 
 **Model answer:**
 
-> "PlantVillage has a roughly 4-to-1 imbalance ratio — the largest class has
-> about 4x more images than the smallest. Without correction, the model learns
-> to bias toward common classes. I addressed this with a `WeightedRandomSampler`
-> which assigns each sample a weight inversely proportional to its class
-> frequency. At each epoch, minority classes are oversampled so the model sees
-> a roughly balanced distribution. The formula is:
-> `weight[class] = total_samples / (num_classes * count[class])`."
+> "This PlantVillage subset is heavily imbalanced: the largest class has about
+> 20x more images than the smallest. Without correction, the model learns to
+> bias toward common classes. I used a `WeightedRandomSampler` where each
+> training image's weight is `1 / count(its class)`, so every class is drawn
+> about equally often. I built the weights from the training split only; built
+> from the whole dataset they would index validation and test images and leak
+> them into training. I didn't also weight the loss, because that would
+> correct the imbalance twice."
 
-> "I confirmed the effect by checking that batch label distributions were
-> roughly uniform after applying the sampler, versus heavily skewed without it."
+> "A unit test checks that a class with 10% of the images is drawn about 50%
+> of the time in a two-class case. I judge the model with macro F1, which
+> weights every class equally."
 
-*Reference: `src/dataset.py` — `create_weighted_sampler()`*
+*Reference: `crop_ml/data.py` — `make_balanced_sampler()`*
 
 ---
 
@@ -1730,10 +2129,10 @@ specific code you wrote this phase.
 
 > "A common mistake is using test set performance to make any model decision —
 > that inflates the reported accuracy and the model isn't as good as reported.
-> In my pipeline I split the data before any preprocessing and only accessed
-> the test loader in the final evaluation cell."
+> In my pipeline the split is stratified, saved to `splits.json`, and the test
+> files are only read by `evaluate.py` after training is finished."
 
-*Reference: `src/dataset.py` — `create_dataloaders()`*
+*Reference: `crop_ml/data.py` — `split_dataset()`, `build_dataloaders()`*
 
 ---
 
@@ -1744,16 +2143,17 @@ specific code you wrote this phase.
 > "MobileNetV2 was pretrained on ImageNet — 1.2 million images across 1000
 > classes. The early layers learned to detect edges, textures, and shapes that
 > are universally useful for image recognition. Training those from scratch on
-> 54,000 images would likely overfit and take much longer. Transfer learning
-> lets me start from that knowledge and only adapt the final classifier layer
-> to my 38 crop disease classes."
+> about 20,000 images would likely overfit and take much longer. Transfer
+> learning lets me start from that knowledge and only adapt the final
+> classifier layer to my 15 crop disease classes."
 
 > "In practice: I froze the backbone initially and only trained the new
-> classifier head. This converged in 10 epochs to around 90% validation
-> accuracy. If I had tried to train all 3.4 million parameters from scratch
-> on this dataset size, I'd likely have got much worse results."
+> classifier head: 19,215 trainable parameters instead of about 2.2 million.
+> I also kept the frozen layers' BatchNorm statistics fixed. Training all the
+> weights from scratch on this dataset size would likely give much worse
+> results."
 
-*Reference: `src/train.py` — `build_model(freeze_backbone=True)`*
+*Reference: `crop_ml/model.py` — `build_model(freeze_backbone=True)`*
 
 ---
 
@@ -1768,13 +2168,13 @@ specific code you wrote this phase.
 
 > "I detect it by plotting training and validation loss curves together. I
 > prevent it with: (1) dropout in the MobileNetV2 classifier, (2) L2
-> regularisation via `weight_decay=1e-4` in the Adam optimiser, (3) data
-> augmentation which artificially increases the diversity of training examples,
-> (4) label smoothing which prevents overconfident predictions, and (5) early
-> stopping via saving checkpoints at the best validation accuracy and stopping
-> if it doesn't improve."
+> regularisation via `weight_decay=1e-4` in AdamW, (3) data augmentation,
+> which artificially increases the diversity of training examples, (4) label
+> smoothing, which prevents overconfident predictions, and (5) early stopping:
+> I keep the checkpoint with the lowest validation loss and stop after 3
+> epochs without improvement."
 
-*Reference: `src/train.py`, `src/transforms.py`*
+*Reference: `crop_ml/train.py`, `crop_ml/transforms.py`*
 
 ---
 
@@ -1796,7 +2196,7 @@ specific code you wrote this phase.
 > performing classes using macro F1 — averaging F1 across all classes equally,
 > regardless of class frequency."
 
-*Reference: `src/evaluate.py` — `evaluate()`*
+*Reference: `crop_ml/evaluate.py` — `evaluate()`*
 
 ---
 
@@ -1838,15 +2238,17 @@ specific code you wrote this phase.
 > "Not necessarily — it depends on the class distribution. If 95% of images
 > are 'Healthy', a model that always predicts Healthy gets 95% accuracy while
 > being completely useless. That's why I use macro F1 as the primary metric for
-> PlantVillage — it averages F1 across all 38 classes equally, regardless of
+> PlantVillage — it averages F1 across all 15 classes equally, regardless of
 > how many images each class has. A model that ignores minority classes will
 > have low F1 even with high accuracy."
 
 > "I also produce a per-class breakdown and identify the worst performing
 > classes. Those are the classes that need more data, better augmentation, or
-> class-specific strategies."
+> class-specific strategies. And because PlantVillage contains near-duplicate
+> photos of the same leaf, even a good test score is optimistic for real
+> field photos."
 
-*Reference: `src/evaluate.py`*
+*Reference: `crop_ml/evaluate.py`*
 
 ---
 
@@ -1854,15 +2256,18 @@ specific code you wrote this phase.
 
 ```mermaid
 flowchart TD
-    M1["❌ Applying augmentation\nto validation/test data"]:::bad --> F1["Metrics become\nunreliable and inflated"]
-    M2["❌ Evaluating on test set\nduring hyperparameter tuning"]:::bad --> F2["Reported accuracy\n is a lie"]
-    M3["❌ Ignoring class imbalance\nbefore training"]:::bad --> F3["Model ignores\nminority classes"]
-    M4["❌ Reporting only accuracy\non imbalanced data"]:::bad --> F4["Misleading metric —\nuse macro F1"]
-    M5["❌ Using the same random seed\nfor split AND augmentation"]:::bad --> F5["Subtle data leakage\nbetween splits"]
-    M6["❌ Forgetting model.eval()\nduring validation"]:::bad --> F6["Dropout active → noisy,\nirreproducible val metrics"]
+    M1["❌ Augmenting validation/test images"]:::bad --> F1["Noisy, unrepeatable metrics"]
+    M2["❌ Setting .transform on random_split subsets<br/>(they share one dataset)"]:::bad --> F2["Last assignment wins:<br/>train silently gets NO augmentation"]
+    M3["❌ Building the sampler from the full dataset"]:::bad --> F3["Sampler draws val/test images<br/>into training (leakage)"]
+    M4["❌ Evaluating on test during tuning"]:::bad --> F4["Reported accuracy is inflated"]
+    M5["❌ Reporting only accuracy on imbalanced data"]:::bad --> F5["Misleading: use macro F1"]
+    M6["❌ Forgetting model.eval() for validation"]:::bad --> F6["Dropout/BatchNorm in train mode:<br/>noisy val metrics"]
+    M7["❌ glob('*.jpg') on this dataset"]:::bad --> F7["Misses every .JPG file"]
 
     classDef bad fill:#fce4ec,stroke:#e91e63,color:#880e4f
 ```
+
+Every one of these is avoided in `crop_ml/data.py` / `train.py`, and M2, M3 and M7 have tests.
 
 ---
 
@@ -1876,6 +2281,7 @@ flowchart TD
 | [PyTorch Transfer Learning Tutorial](https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html) | Tutorial | Official guide — covers exactly what you built in `src/train.py` |
 | [torchvision transforms v2](https://pytorch.org/vision/stable/transforms.html) | Docs | Complete reference for all augmentation options |
 | [Kaggle Learn: Pandas](https://www.kaggle.com/learn/pandas) | Interactive | Real pandas exercises on messy data — do one while building EDA notebook |
+| [uv documentation](https://docs.astral.sh/uv/) | Docs | Projects, `uv add`, `uv sync`, `uv run`, lockfiles |
 | [Scikit-learn metrics user guide](https://scikit-learn.org/stable/modules/model_evaluation.html) | Docs | Precision, recall, F1, confusion matrix — authoritative reference |
 | [PlantVillage dataset on Kaggle](https://www.kaggle.com/datasets/emmarex/plantdisease) | Dataset | The dataset you use throughout this project |
 | [PyTorch MPS (Apple Silicon) guide](https://pytorch.org/docs/stable/notes/mps.html) | Docs | Using your M5 GPU for training — significant speedup |
@@ -1888,54 +2294,45 @@ flowchart TD
 
 Complete every item before moving to Phase 2.
 
-### Code
+### Code (all in `ml-training/`)
 
-- [ ] `src/gradient_descent.py` runs and produces two plots
-- [ ] `src/lr_experiment.py` runs and shows three convergence curves
-- [ ] `src/loss_functions.py` runs with no errors
-- [ ] `src/dataset.py` — `create_dataloaders()` loads PlantVillage without error
-- [ ] `src/transforms.py` — training and val pipelines confirmed different
-- [ ] `src/train.py` — training loop completes at least 5 epochs
-- [ ] `src/evaluate.py` — produces confusion matrix PNG and eval_summary.json
+- [ ] `uv sync` then `uv run pytest`: all tests pass
+- [ ] `uv run ruff check .` is clean
+- [ ] `python -m crop_ml.theory.gradient_descent` / `lr_experiment` / `loss_functions` run
+- [ ] `python -m crop_ml.eda` runs on the real dataset (15 classes found)
+- [ ] `python -m crop_ml.train` completes (early stopping may end it before 10 epochs)
+- [ ] `python -m crop_ml.evaluate` writes the confusion matrix and `eval_summary.json`
 
 ### Notebooks
 
-- [ ] `notebooks/01_gradient_descent.ipynb` — committed with output cells visible
-- [ ] `notebooks/02_plantvillage_eda.ipynb` — class distribution plot visible
-- [ ] `notebooks/03_baseline_model.ipynb` — training history and confusion matrix visible
+- [ ] `01_gradient_descent.ipynb`: committed with output cells visible
+- [ ] `02_plantvillage_eda.ipynb`: class distribution visible
+- [ ] `03_baseline_model.ipynb`: training curves and confusion matrix visible
 
-### Outputs (gitignored but present locally)
+### Outputs (gitignored, present locally)
 
-- [ ] `outputs/plots/gradient_descent.png`
-- [ ] `outputs/plots/learning_rate_comparison.png`
-- [ ] `outputs/plots/class_distribution.png`
-- [ ] `outputs/plots/training_history.png`
-- [ ] `outputs/plots/confusion_matrix.png`
-- [ ] `outputs/checkpoints/mobilenetv2_v1_best.pt`
-- [ ] `outputs/eval_summary.json`
-- [ ] `data/class_names.json`
-- [ ] `data/metadata.csv`
+- [ ] `outputs/plots/{gradient_descent,learning_rate_comparison,class_distribution,confusion_matrix}.png`
+- [ ] `outputs/checkpoints/mobilenetv2_v1_best.pt` and `class_names.json`
+- [ ] `outputs/splits.json`, `outputs/eval_summary.json`, `data/metadata.csv`
 
 ### GitHub
 
-- [ ] Repository created with the correct folder structure
-- [ ] `.gitignore` excludes `data/` and `outputs/checkpoints/`
-- [ ] `README.md` has: project description, setup instructions, phase 1 results summary
-- [ ] All three notebooks committed with rendered output cells
-- [ ] `requirements.txt` generated with `uv pip freeze > requirements.txt`
+- [ ] `.gitignore` excludes `data/`, `outputs/`, `.venv/`
+- [ ] `pyproject.toml` and `uv.lock` committed (they replace `requirements.txt`)
+- [ ] `ml-training/README.md` states your test accuracy and macro F1
 
 ### Interview readiness
 
-- [ ] Can explain gradient descent on a whiteboard without notes
-- [ ] Can name three differences between MSE and cross-entropy loss
-- [ ] Can explain why validation and test must be separate
-- [ ] Can explain what class imbalance is and name two ways to handle it
-- [ ] Can draw the CNN architecture flow from memory
-- [ ] Can state Phase 1 test accuracy and macro F1 score from memory
+- [ ] Explain gradient descent on a whiteboard without notes
+- [ ] Explain why lr=0.5 converged but lr=1.05 diverged
+- [ ] Name three differences between MSE and cross-entropy
+- [ ] Explain why validation and test must be separate
+- [ ] Explain class imbalance and two ways to handle it
+- [ ] Draw the CNN flow from memory
+- [ ] State your test accuracy and macro F1 from memory
 
 ---
 
-> **Next:** Phase 2 — Python ML Service (FastAPI)
-> The model checkpoint at `outputs/checkpoints/mobilenetv2_v1_best.pt` and the
-> class names at `data/class_names.json` are the two files Phase 2 consumes
-> directly.
+> **Next:** Phase 2 — Python ML Service (FastAPI).
+> It consumes `outputs/checkpoints/mobilenetv2_v1_best.pt` and `class_names.json`
+> (copy them into `python-ml-service/models/`).

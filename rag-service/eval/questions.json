@@ -1,0 +1,12 @@
+[
+  {"question": "What causes late blight in potatoes?",
+   "reference": "Potato late blight is caused by Phytophthora infestans, a water mould (oomycete), not a true fungus."},
+  {"question": "Under what weather conditions does potato late blight spread fastest?",
+   "reference": "High humidity above about 90% with moderate temperatures of roughly 10-26 °C (50-78 °F)."},
+  {"question": "How can I recognise early blight on potato leaves?",
+   "reference": "Circular to angular dark brown spots about 3-4 mm across with concentric target-like rings, starting on older leaves; badly affected leaves yellow and drop."},
+  {"question": "How do I tell early blight from late blight on potato?",
+   "reference": "Early blight has smaller, dry, target-like spots; late blight lesions are larger, greasy, spread fast and show white growth on the leaf underside."},
+  {"question": "What should I do to protect potato tubers from late blight before harvest?",
+   "reference": "Kill vines completely 2-3 weeks before harvest, plant certified seed tubers, and destroy cull piles and volunteer potatoes."}
+]

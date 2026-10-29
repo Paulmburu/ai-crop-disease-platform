@@ -1,0 +1,11 @@
+.venv
+.env
+.chroma
+__pycache__
+.pytest_cache
+.ruff_cache
+.mypy_cache
+tests
+eval
+*.md
+!knowledge/*.md

@@ -1,0 +1,50 @@
+[project]
+name = "crop-ml"
+version = "0.1.0"
+description = "Phase 1: PlantVillage data pipeline and MobileNetV2 baseline for crop disease classification"
+readme = "README.md"
+authors = [
+    { name = "Paul Mburu", email = "paulmburu53@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.4.6",
+    "pandas>=3.1.0",
+    "pillow>=13.0.0",
+    "scikit-learn>=1.9.1",
+    "seaborn>=0.13.2",
+    "torch>=2.15.0",
+    "torchvision>=0.29.2",
+    "tqdm>=4.70.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "jupyter>=1.1.1",
+    "kaggle>=2.2.5",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+per-file-ignores = { "notebooks/*" = ["E402", "E701", "E702"] }  # notebooks favour short exploratory lines
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

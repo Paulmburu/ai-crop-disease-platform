@@ -10,7 +10,7 @@
 
 - A **Python FastAPI ML service** that accepts an image and returns `{"class": "leaf blight", "confidence": 0.91}`
 - A **Go API gateway** that handles uploads, auth, rate limiting, retries, and proxies to the Python service
-- A **RAG chatbot** (Phase 4 priority) that lets users ask "what causes this disease?" against a domain knowledge base
+- A **RAG chatbot** (Phase 3) that lets users ask "what causes this disease?" against a domain knowledge base
 - A **Flutter mobile app** with offline-first TFLite on-device inference
 - An **Android KMP module** that shares ML inference logic between Android and iOS natively
 
@@ -74,14 +74,14 @@ brew install node
 # Verify Flutter
 flutter doctor
 
-# Ollama — for local LLM in Phase 4 (RAG)
+# Ollama — for local LLM in Phase 3 (RAG)
 brew install ollama
 ollama pull llama3.2   # 3B model, runs well on M5
 ```
 
 ### Python project setup pattern
 
-Use this pattern for every Python service you create (Phase 2, Phase 4 RAG):
+Use this pattern for every Python service you create (Phase 2, Phase 3 RAG):
 
 ```bash
 # Create project with uv
@@ -98,8 +98,8 @@ uv add fastapi uvicorn torch torchvision pillow pydantic
 # Dev dependencies
 uv add --dev pytest pytest-asyncio httpx mypy ruff
 
-# Freeze
-uv pip freeze > requirements.txt
+# Lock: uv writes uv.lock automatically on every `uv add`; commit it (no requirements.txt needed)
+uv lock
 ```
 
 ### Go project setup pattern
@@ -122,8 +122,8 @@ Create one mono-repo for the entire project:
 ```
 ai-crop-disease-platform/
 ├── python-ml-service/       # Phase 2 — FastAPI + model
-├── go-gateway/              # Phase 3 — Go API
-├── rag-service/             # Phase 4 — RAG pipeline
+├── go-gateway/              # Phase 4 — Go API
+├── rag-service/             # Phase 3 — RAG pipeline
 ├── flutter-app/             # Phase 6 — Flutter mobile
 ├── android-kmp/             # Phase 7 — KMP shared module
 ├── docker-compose.yml       # runs all services locally
@@ -472,8 +472,10 @@ val_transforms = transforms.Compose([
 **Write your own evaluation reporter:**
 
 ```python
-from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
 import seaborn as sns
+import torch
+from sklearn.metrics import classification_report, confusion_matrix
 
 def evaluate_model(model, dataloader, class_names):
     all_preds, all_labels = [], []
@@ -487,10 +489,11 @@ def evaluate_model(model, dataloader, class_names):
             all_labels.extend(labels.numpy())
 
     # Full report
-    print(classification_report(all_labels, all_preds, target_names=class_names))
+    labels = list(range(len(class_names)))  # keep every class even if absent from this split
+    print(classification_report(all_labels, all_preds, labels=labels, target_names=class_names, zero_division=0))
 
     # Confusion matrix heatmap
-    cm = confusion_matrix(all_labels, all_preds)
+    cm = confusion_matrix(all_labels, all_preds, labels=labels)
     plt.figure(figsize=(12, 10))
     sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
     plt.savefig("confusion_matrix.png")
@@ -547,6 +550,10 @@ touch app/models/.gitkeep        # model weights go here (gitignored)
 
 ### Train and export the model
 
+> Sketch of the idea. The real, tested implementation is `ml-training/src/crop_ml/train.py`
+> (see `docs/PHASE_1_ML_THEORY_AND_DATA.md`); it uses separate train/val transforms, a
+> stratified split and early stopping.
+
 ```python
 # scripts/train.py
 import torch
@@ -554,6 +561,13 @@ import torch.nn as nn
 from torchvision import models, datasets, transforms
 from torch.utils.data import DataLoader, random_split
 from pathlib import Path
+
+train_transforms = transforms.Compose([
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+])
 
 def train(data_dir: str, output_dir: str, epochs: int = 10):
     # Dataset
@@ -586,13 +600,18 @@ def train(data_dir: str, output_dir: str, epochs: int = 10):
     # Save with version
     version = "v1"
     Path(output_dir).mkdir(exist_ok=True)
+    # Keys must match what the Phase 2 service reads (see the checkpoint contract in PHASE_1 doc)
     torch.save({
-        "model_state": model.state_dict(),
+        "model_state_dict": model.state_dict(),
+        "num_classes": len(class_names),
         "class_names": class_names,
-        "version": version
-    }, f"{output_dir}/mobilenetv2_{version}.pt")
+        "model_version": version,
+        "image_size": 224,
+        "mean": [0.485, 0.456, 0.406],
+        "std": [0.229, 0.224, 0.225],
+    }, f"{output_dir}/mobilenetv2_{version}_best.pt")
 
-    print(f"Saved model to {output_dir}/mobilenetv2_{version}.pt")
+    print(f"Saved model to {output_dir}/mobilenetv2_{version}_best.pt")
 ```
 
 **Export to TFLite for Phase 6 (Flutter + Android KMP):**
@@ -643,7 +662,7 @@ import structlog
 
 router = APIRouter(prefix="/api/v1")
 log = structlog.get_logger()
-svc = InferenceService(model_path="app/models/mobilenetv2_v1.pt")
+svc = InferenceService(model_path="models/mobilenetv2_v1_best.pt")  # real version: python-ml-service/app/
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict(file: UploadFile = File(...)):
@@ -679,12 +698,12 @@ class PredictionResponse(BaseModel):
 ```python
 # tests/test_predict.py
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from app.main import app
 
 @pytest.mark.asyncio
 async def test_predict_valid_image():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test")  # httpx 0.28 removed app= as client:
         with open("tests/fixtures/healthy_leaf.jpg", "rb") as f:
             response = await client.post(
                 "/api/v1/predict",
@@ -697,12 +716,12 @@ async def test_predict_valid_image():
 
 @pytest.mark.asyncio
 async def test_predict_invalid_type():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test")  # httpx 0.28 removed app= as client:
         response = await client.post(
             "/api/v1/predict",
             files={"file": ("doc.pdf", b"fake", "application/pdf")}
         )
-    assert response.status_code == 400
+    assert response.status_code == 415  # Unsupported Media Type
 ```
 
 ### Dockerfile
@@ -755,6 +774,11 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ### Why this is promoted to Priority 4
 
 AI engineer interviews in 2026 are 60%+ GenAI-focused. RAG, LLMs, prompt engineering, and agents dominate technical rounds. CNN knowledge now covers roughly 25% of what interviewers ask. Do not deprioritise this phase.
+
+> **Implemented differently.** The snippets below are the original LangChain + Gemini sketch and
+> no longer run as written: LangChain 1.x moved these imports, `vectorstore.persist()` no longer
+> exists, and `gemini-1.5-flash` is retired. The real, tested service is in `rag-service/`: chromadb
+> plus Ollama directly, no LangChain, no cloud key. See `docs/PHASE_3_RAG_PIPELINE.md`.
 
 ### Setup for this phase
 
