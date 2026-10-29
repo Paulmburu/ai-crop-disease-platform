@@ -7,7 +7,9 @@ import (
 )
 
 // Pinger checks a dependency (the database pool satisfies it).
-type Pinger interface{ Ping(ctx context.Context) error }
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
 
 // Health: liveness, 200 while the process runs.
 func Health(w http.ResponseWriter, _ *http.Request) {
