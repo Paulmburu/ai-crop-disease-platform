@@ -117,3 +117,43 @@ func TestErrorsUseSharedShape(t *testing.T) {
 		})
 	}
 }
+
+func diag(id, captured string) string {
+	return `{"id":"` + id + `","device_id":"device-9","class_label":"Potato___Early_blight","confidence":0.8,` +
+		`"confidence_threshold":0.5,"model_version":"v1","captured_at":"` + captured + `"}`
+}
+
+func TestSyncAndHistory(t *testing.T) {
+	srv := newServer(t, pinger{})
+	batch := `{"items":[` +
+		diag("00000000-0000-4000-8000-000000000001", "2026-10-30T10:00:00Z") + `,` +
+		diag("00000000-0000-4000-8000-000000000002", "2026-10-30T11:00:00Z") + `,` +
+		diag("00000000-0000-4000-8000-000000000003", "2026-10-30T09:00:00Z") + `,` +
+		`{"id":"bad","device_id":"device-9","class_label":"x","confidence":0.8,"confidence_threshold":0.5,"model_version":"v1","captured_at":"2026-10-30T09:00:00Z"}` +
+		`]}`
+	r, b := do(t, srv, "POST", "/api/v1/diagnoses:sync", "test-key", batch)
+	if r.StatusCode != 200 || b["created"] != 3.0 || b["invalid"] != 1.0 {
+		t.Fatalf("first sync: %d %v", r.StatusCode, b)
+	}
+	_, b = do(t, srv, "POST", "/api/v1/diagnoses:sync", "test-key", batch)
+	if b["duplicate"] != 3.0 || b["created"] != 0.0 {
+		t.Fatalf("resync must be all duplicate: %v", b)
+	}
+
+	_, page1 := do(t, srv, "GET", "/api/v1/devices/device-9/diagnoses?limit=2", "test-key", "")
+	items := page1["items"].([]any)
+	if len(items) != 2 || items[0].(map[string]any)["id"] != "00000000-0000-4000-8000-000000000002" {
+		t.Fatalf("page 1 not newest first: %v", page1)
+	}
+	cursor, _ := page1["next_cursor"].(string)
+	_, page2 := do(t, srv, "GET", "/api/v1/devices/device-9/diagnoses?limit=2&cursor="+cursor, "test-key", "")
+	if len(page2["items"].([]any)) != 1 || page2["next_cursor"] != nil {
+		t.Fatalf("page 2: %v", page2)
+	}
+	if r, b := do(t, srv, "GET", "/api/v1/devices/device-9/diagnoses?cursor=bm90LWEtY3Vyc29y", "test-key", ""); r.StatusCode != 400 || b["error"] != "invalid_cursor" {
+		t.Fatalf("bad cursor: %d %v", r.StatusCode, b)
+	}
+	if r, b := do(t, srv, "POST", "/api/v1/diagnoses:sync", "test-key", `{"items":[]}`); r.StatusCode != 422 || b["error"] != "empty_batch" {
+		t.Fatalf("empty batch: %d %v", r.StatusCode, b)
+	}
+}

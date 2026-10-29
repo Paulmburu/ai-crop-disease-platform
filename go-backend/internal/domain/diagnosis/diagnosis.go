@@ -20,8 +20,11 @@ const (
 	StatusUncertain Status = "uncertain"
 )
 
-// MaxClockSkew tolerates phones whose clock runs slightly ahead of the server.
-const MaxClockSkew = 5 * time.Minute
+// MaxClockSkew tolerates phones whose clock or time zone setting is wrong.
+// Farmers' phones often have the wrong time; rejecting their whole backlog would
+// lose data, so only clearly impossible times (> 24 h ahead) are refused.
+// RecordedAt (server time) is the authoritative timestamp.
+const MaxClockSkew = 24 * time.Hour
 
 var uuidRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
@@ -107,11 +110,26 @@ func (d *Diagnosis) IsHealthy() bool {
 	return d.Status() == StatusOK && strings.HasSuffix(strings.ToLower(d.classLabel), "healthy")
 }
 
+// Cursor marks a position in a device's history (newest first): the last item seen.
+type Cursor struct {
+	CapturedAt time.Time
+	ID         string
+}
+
+// CursorOf returns the cursor that continues after d.
+func CursorOf(d *Diagnosis) Cursor { return Cursor{CapturedAt: d.capturedAt, ID: d.id} }
+
 // Repository is the persistence port for diagnoses (implemented in infrastructure).
 type Repository interface {
 	// Save stores d unless a diagnosis with the same id exists. It returns
 	// created=false (and no error) for an existing id, which makes sync idempotent.
 	Save(ctx context.Context, d *Diagnosis) (created bool, err error)
+	// SaveMany stores all new diagnoses atomically and returns the ids that were created
+	// (ids already stored are skipped, not errors).
+	SaveMany(ctx context.Context, ds []*Diagnosis) (created map[string]bool, err error)
 	// FindByID returns a shared.KindNotFound error when the id is unknown.
 	FindByID(ctx context.Context, id string) (*Diagnosis, error)
+	// ListByDevice returns up to limit diagnoses for a device, newest first,
+	// strictly after the cursor when one is given.
+	ListByDevice(ctx context.Context, deviceID string, after *Cursor, limit int) ([]*Diagnosis, error)
 }

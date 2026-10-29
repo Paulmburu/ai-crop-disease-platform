@@ -32,7 +32,7 @@ func TestNewDiagnosisInvariants(t *testing.T) {
 		{"threshold > 1", func(in *diagnosis.NewInput) { in.ConfidenceThreshold = 2 }, "invalid_threshold"},
 		{"no model version", func(in *diagnosis.NewInput) { in.ModelVersion = "" }, "invalid_model_version"},
 		{"no capture time", func(in *diagnosis.NewInput) { in.CapturedAt = time.Time{} }, "invalid_captured_at"},
-		{"future capture", func(in *diagnosis.NewInput) { in.CapturedAt = now.Add(time.Hour) }, "invalid_captured_at"},
+		{"future capture", func(in *diagnosis.NewInput) { in.CapturedAt = now.Add(25 * time.Hour) }, "invalid_captured_at"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -43,7 +43,9 @@ func NewRouter(d Deps) http.Handler {
 		r.Use(chimw.Timeout(d.RequestTimeout), middleware.APIKey(d.APIKeys, handlers.WriteError))
 		dh := handlers.Diagnoses{Service: d.Diagnoses, Log: d.Log, MaxBodyBytes: d.MaxBodyBytes}
 		r.Post("/diagnoses", dh.Create)
+		r.Post("/diagnoses:sync", dh.Sync)
 		r.Get("/diagnoses/{id}", dh.Get)
+		r.Get("/devices/{device_id}/diagnoses", dh.History)
 	})
 	return r
 }
