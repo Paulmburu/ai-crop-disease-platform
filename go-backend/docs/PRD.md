@@ -104,8 +104,8 @@ flowchart LR
 | ID | Requirement | Milestone |
 |---|---|---|
 | A1 | `POST /api/v1/advice` → forwards to `rag-service` `/api/v1/ask` with `class_name`; returns answer + sources | M3 |
-| A2 | Timeout (default 30 s), one retry on connection error only, 503 `advice_unavailable` when the RAG service is down | M3 |
-| A3 | Optional: `POST /api/v1/predictions` proxy to `python-ml-service` | M3 |
+| A2 | Timeout (default 60 s), one retry on connection error only, 503 `advice_unavailable` when the RAG service is down | M3 |
+| A3 | `POST /api/v1/predictions` proxy to `python-ml-service` (Go is the app's single entry point) | M3 |
 
 ## 6. Non-functional requirements
 

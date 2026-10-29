@@ -48,14 +48,30 @@ migrations/              goose SQL files, embedded in the binary
 docs/                    PRD · ROADMAP · PROGRESS
 ```
 
-## Endpoints (milestone M0)
+## Endpoints
+
+Go is the app's **single entry point**: it proxies predictions to `python-ml-service` and
+advice to `rag-service`, and serves the `.tflite` model itself.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/health` | none | Liveness |
-| GET | `/ready` | none | 200 when PostgreSQL answers, else 503 |
-| POST | `/api/v1/diagnoses` | `X-API-Key` | Record a diagnosis from the phone: **201** new, **200** already synced (idempotent) |
+| GET | `/ready` | none | `{"database","ml_service","rag_service"}` booleans; 503 only when the DB is down |
+| POST | `/api/v1/diagnoses` | `X-API-Key` | Record one diagnosis: **201** new, **200** already synced (idempotent) |
+| POST | `/api/v1/diagnoses:sync` | `X-API-Key` | Up to 500 diagnoses; per-item `created` / `duplicate` / `invalid` |
 | GET | `/api/v1/diagnoses/{id}` | `X-API-Key` | Fetch one diagnosis |
+| GET | `/api/v1/devices/{device_id}/diagnoses?limit=&cursor=` | `X-API-Key` | History, newest first, `next_cursor` |
+| GET | `/api/v1/model-releases/latest` | `X-API-Key` | Current model metadata; `ETag` = sha256, 304 on `If-None-Match` |
+| GET | `/api/v1/model-releases/{version}/artifact` | `X-API-Key` | The `.tflite` file (Range/resume supported, `X-Checksum-Sha256`) |
+| POST | `/api/v1/predictions` | `X-API-Key` | Multipart `file` → ML service (online fallback) |
+| POST | `/api/v1/advice` | `X-API-Key` | `{question, class_name}` → RAG service; answer with sources |
+| POST | `/api/v1/model-releases` | admin key | Publish a version whose file is in `MODELS_DIR` |
+| DELETE | `/api/v1/model-releases/{version}` | admin key | Withdraw; "latest" falls back to the previous one |
+
+On startup every `crop_disease_<v>.tflite` + `.json` pair in `MODELS_DIR` (written by
+`ml-training/scripts/export_tflite.py`) is published if not already. sha256 and size are always
+computed from the file; a file replaced after publishing is refused (409 `artifact_checksum_mismatch`):
+publish a new version instead.
 
 Errors always look like the Python services':
 `{"error": "invalid_confidence", "detail": "...", "request_id": "..."}`.
@@ -78,7 +94,7 @@ curl -X POST localhost:8080/api/v1/diagnoses -H 'X-API-Key: dev-key' -H 'Content
 ```
 
 Run the same POST again: **200** instead of 201, and still one row. That is the idempotent sync
-the offline app relies on. `captured_at` must not be in the future (5-minute clock-skew allowance).
+the offline app relies on. `captured_at` must not be more than 24 h in the future (phones with wrong clocks).
 
 Everything in Docker: `make docker` (22 MB distroless image, health-checked).
 
@@ -93,15 +109,35 @@ Everything in Docker: `make docker` (22 MB distroless image, health-checked).
 | `REQUEST_TIMEOUT` | `15s` | per request under `/api/v1` |
 | `SHUTDOWN_TIMEOUT` | `10s` | drain time on SIGTERM |
 | `MAX_BODY_BYTES` | `1048576` | larger bodies get 413 |
+| `ADMIN_API_KEYS` | (empty) | keys for publish/withdraw; empty disables those routes |
+| `MODELS_DIR` | `models` | folder with `crop_disease_<v>.tflite` + `.json` |
+| `ML_SERVICE_URL` | `http://localhost:8000` | python-ml-service |
+| `RAG_SERVICE_URL` | `http://localhost:8001` | rag-service |
+| `PREDICT_TIMEOUT` | `10s` | upstream timeout for predictions |
+| `ADVICE_TIMEOUT` | `60s` | upstream timeout for advice (a cold local LLM is slow) |
 
 See `.env.example`.
+
+## Use from a phone
+
+Run everything with `docker compose up -d --build` from the repo root, then point the app at:
+
+| Where the app runs | Base URL |
+|---|---|
+| Android emulator | `http://10.0.2.2:8080` |
+| iOS simulator | `http://localhost:8080` |
+| Real phone (same Wi-Fi) | `http://<laptop LAN IP>:8080` (`ipconfig getifaddr en0`); allow incoming connections in the macOS firewall |
+
+Plain HTTP is blocked by default on phones: Android needs `android:usesCleartextTraffic="true"`
+(or a network security config for the LAN IP) and iOS needs an ATS exception
+(`NSAllowsLocalNetworking`). Local demo only; use HTTPS anywhere else.
 
 ## Tests
 
 | Command | What | Needs |
 |---|---|---|
 | `make test` | domain, application, HTTP and architecture tests | nothing |
-| `make test-integration` | + PostgreSQL repository tests | `make db-up` |
+| `make test-integration` | + PostgreSQL repository tests, in a separate `crop_test` database (they TRUNCATE) | `make db-up` |
 | `make lint` | `go vet` + staticcheck | nothing |
 
 ## Adding a feature

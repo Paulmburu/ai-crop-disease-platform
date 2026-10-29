@@ -42,7 +42,7 @@ cmd/api/main.go wires concrete types together (composition root)
 
 ## Conventions
 - **Errors:** domain returns `shared.Error` kinds (`KindInvalid`, `KindNotFound`, `KindConflict`).
-  Only `interfaces/http/errors.go` maps kinds to HTTP status. Never return HTTP codes from below that layer.
+  Only `interfaces/http/handlers/respond.go` maps kinds to HTTP status. Never return HTTP codes from below that layer.
 - **Error JSON:** always `{"error": "<code>", "detail": "...", "request_id": "..."}`; same as the Python services.
 - **Context:** every repository and use-case method takes `ctx context.Context` first.
 - **Time:** never call `time.Now()` in domain/application; inject a `Clock`.
@@ -56,7 +56,7 @@ cmd/api/main.go wires concrete types together (composition root)
 | Kind | Command | Needs |
 |---|---|---|
 | Unit (domain, application, http) | `make test` | nothing |
-| Integration (repositories) | `make db-up && make test-integration` | Docker |
+| Integration (repositories) | `make db-up && make test-integration` (uses `TEST_DATABASE_URL` → `crop_test`; never point it at a real DB, tests TRUNCATE) | Docker |
 | Lint | `make lint` | nothing (runs `go vet` + staticcheck via `go run`) |
 
 Rules: table-driven tests; no sleeps; no real network in unit tests (`httptest`); every bug fix

@@ -5,11 +5,11 @@ Update this file whenever a milestone item changes state. Evidence = command out
 | Milestone | Status | Date |
 |---|---|---|
 | M0 Template | ✅ Done | 2026-10-30 |
-| M1 Diagnosis sync | ⏳ Not started | |
-| M2 Model releases | ⏳ Not started | |
-| M3 Advice proxy | ⏳ Not started | |
+| M1 Diagnosis sync | ✅ Done | 2026-10-30 |
+| M2 Model releases | ✅ Done | 2026-10-30 |
+| M3 Prediction + advice gateway | ✅ Done | 2026-10-30 |
 | M4 Hardening | ⏳ Not started | |
-| M5 Integration and docs | ⏳ Not started | |
+| M5 Integration and docs | 🟡 Compose + API contract done; CI pending | |
 
 ## M0: Template ✅
 
@@ -29,9 +29,37 @@ Update this file whenever a milestone item changes state. Evidence = command out
 **Notes and decisions**
 - Compose PostgreSQL is published on host port **5433**: a locally installed PostgreSQL already uses 5432.
 - `api healthcheck` subcommand exists because the distroless image has no shell or curl.
-- Captured times in the future (beyond 5 minutes of skew) are rejected with 422; phones with wrong clocks will hit this. Revisit in M1 if it shows up.
+- Captured times in the future (beyond 5 minutes of skew) were rejected with 422; raised to 24 h in M1.
 
-## Next: M1 Diagnosis sync
-- [ ] `POST /api/v1/diagnoses:sync` (≤ 500 items, per-item result)
-- [ ] `GET /api/v1/devices/{device_id}/diagnoses` with cursor pagination
-- [ ] Integration test: same batch twice → all `duplicate`, no new rows
+## M1: Diagnosis sync ✅
+
+| Item | Evidence |
+|---|---|
+| `POST /api/v1/diagnoses:sync` (≤ 500, per-item outcome) | `router_test.go` `TestSyncAndHistory`; live: 100 items → `created:100`, same batch again → `duplicate:100`, 100 rows |
+| History with cursor pagination | `TestSaveManyAndPagination`: 250 rows walked in pages of 40, no gaps or repeats |
+
+## M2: Model releases ✅
+
+| Item | Evidence |
+|---|---|
+| Aggregate, repository, migration `00002` | domain + application tests; `TestModelReleaseRepository` (integration) |
+| Startup seeder from `MODELS_DIR` | live log `model release published from models dir version=v1` |
+| Latest + ETag/304, Range download | `TestModelReleaseLifecycle`; live: 304 on `If-None-Match`, Range → 206, downloaded sha256 = `83bb8785…` = file |
+| Admin key, withdraw | `TestModelReleaseLifecycle` (app key → 401, withdraw → 404 `release_withdrawn`) |
+| Replaced file refused | `TestOpenArtifactRejectsReplacedFile` (409 `artifact_checksum_mismatch`) |
+
+## M3: Prediction + advice gateway ✅
+
+| Item | Evidence |
+|---|---|
+| Upstream adapters (timeout, 1 retry on dial, request-id, error mapping) | `upstream_test.go` |
+| HTTP proxies + `/ready` upstream status | `router_gateway_test.go` `TestProxies` |
+| Live | `/ready` all true; PlantVillage late-blight leaf → `Potato___Late_blight` 0.765; `/advice` cited answer (grounded, 7 sources, ~19.5 s); RAG stopped → 503 `advice_unavailable`, `/ready` `rag_service:false` |
+
+**Decisions**
+- Integration tests use a separate `crop_test` DB: they TRUNCATE, and once wiped the demo data and blocked the v1 seed.
+- PlantDoc field photos often come back `uncertain` (54.8% field accuracy); use PlantVillage-style leaves on stage.
+
+## Next
+- M4 hardening (post-talk), CI workflow, rewrite `docs/PHASE_4_GO_BACKEND_GATEWAY.md` from code.
+- Upstream 4xx with a list `detail` is flattened to a string; keep the list once the app shows field errors.

@@ -3,8 +3,13 @@
 The contract the mobile app relies on. Every example below is a **real response** captured
 from the running services (potato model `v1`, 2026-10-29); long lists are shortened.
 
+The app talks **only to go-backend** (`http://<host>:8080`, header `X-API-Key`). The Python
+services below sit behind it; their response bodies are passed through unchanged, so their
+sections still describe what the app receives from `/api/v1/predictions` and `/api/v1/advice`.
+
 | Service | Base URL (local) | Used for |
 |---|---|---|
+| go-backend (`go-backend/`) | `http://localhost:8080` | **Single entry point**: sync, history, model updates, prediction + advice proxies |
 | ML service (`python-ml-service/`) | `http://localhost:8000` | Optional server-side diagnosis, model info |
 | RAG service (`rag-service/`) | `http://localhost:8001` | "What do I do about this?" answers with sources |
 
@@ -26,7 +31,7 @@ sequenceDiagram
     participant U as User
     participant A as App
     participant L as LiteRT (on device)
-    participant R as RAG service
+    participant R as go-backend → RAG
     U->>A: Take photo
     A->>L: preprocess + run model
     L-->>A: probabilities
@@ -35,9 +40,9 @@ sequenceDiagram
     else confident
         A-->>U: Diagnosis (cached in Hive)
         U->>A: "What do I do about this?"
-        A->>R: GET /ready (2 s timeout)
+        A->>R: GET /ready via go-backend (2 s timeout)
         alt ready
-            A->>R: POST /api/v1/ask {question, class_name}
+            A->>R: POST /api/v1/advice {question, class_name}
             R-->>A: answer + sources
             A-->>U: Advice with citations
         else offline / not ready
@@ -45,6 +50,50 @@ sequenceDiagram
         end
     end
 ```
+
+## go-backend (single entry point)
+
+All `/api/v1/*` calls need `X-API-Key`. Endpoint list: `go-backend/README.md`.
+
+### `GET /ready`
+```json
+{"database": true, "ml_service": true, "rag_service": true, "status": "ready"}
+```
+503 only when the database is down. Use `ml_service` / `rag_service` to enable or grey out
+"diagnose online" and "advice".
+
+### `POST /api/v1/diagnoses:sync`
+Body `{"items": [diagnosis, ...]}` (≤ 500). Each item is the same object as `POST /api/v1/diagnoses`
+(`id` UUID generated on the phone, `device_id`, `class_label`, `confidence`, `confidence_threshold`,
+`model_version`, `captured_at`). Safe to resend: already-synced ids come back `duplicate`.
+```json
+{"created": 100, "duplicate": 0, "invalid": 0, "items": [{"id": "…", "outcome": "created"}, …]}
+```
+Invalid items carry `"error": {"code", "detail"}` and do not fail the batch. Remove from the local
+queue everything that is `created` or `duplicate`.
+
+### `GET /api/v1/devices/{device_id}/diagnoses?limit=50&cursor=…`
+`{"items": [...], "next_cursor": "…" | null}`, newest first; pass `next_cursor` back to page.
+
+### `GET /api/v1/model-releases/latest`
+```json
+{"version": "v1", "sha256": "83bb87857f2daa43f1fe2f165a46f92af1d22d10b3e324483949e76d0c969b7b",
+ "size_bytes": 8983376, "class_labels": ["Potato___Early_blight", "Potato___Late_blight", "Potato___healthy"],
+ "confidence_threshold": 0.5, "input_shape": [1, 224, 224, 3], "input_layout": "NHWC",
+ "artifact_url": "/api/v1/model-releases/v1/artifact", "published_at": "2026-10-29T23:05:13Z"}
+```
+Send the stored `ETag` as `If-None-Match`: **304** means the phone already has it.
+Download `artifact_url` (Range supported for resume), check the file's sha256 equals `sha256`,
+then swap models atomically; keep the old one if the check fails.
+
+### `POST /api/v1/predictions`, `POST /api/v1/advice`
+Same request and response as the ML service `predict` and RAG service `ask` below.
+
+| Status | `error` | When |
+|---|---|---|
+| 503 | `prediction_unavailable`, `advice_unavailable` | Upstream down, slow or broken: keep the on-device result, retry later |
+| 404 | `release_withdrawn`, `no_release` | Model version not downloadable |
+| 409 | `artifact_checksum_mismatch` | Server file changed after publishing; do not install |
 
 ## ML service
 
