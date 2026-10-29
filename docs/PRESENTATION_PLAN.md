@@ -110,6 +110,7 @@ After each stage, all three projects pass `uv run ruff check . && uv run pytest`
 | B1–B3 Export + API | ✅ | `.tflite` 9.0 MB, `[1,224,224,3]` → `[1,3]`, matches PyTorch to 8e-7; `/predict` returns `status` |
 | B4 Contract | ✅ | `docs/API_CONTRACT.md` (real responses) |
 | C1–C3 RAG | ✅ | 3 potato notes, 17 chunks. RAGAS (5 Qs, 8B judge): faithfulness 0.51 → **0.88** after two fixes |
+| Field photos (PlantDoc) | ✅ | 221 potato field photos: accuracy **54.8%** (lab 95.8%); early blight recall 38.8%; threshold still answers 86% of them at 55% accuracy |
 | D Benchmarks | ✅ | `benchmarks/results.md`: on-device **1.8 ms** vs backend 18 ms server time; modelled 3 MB photo upload ≈ 34 s on 3G, ≈ 4 min on 2G; RAG warm ≈ 3.3 s |
 | E Flutter app | ⏳ | Not started (by design) |
 
@@ -125,6 +126,8 @@ Lessons for the talk: padding rules in prompts invite invented advice, and tiny 
 name their subject ("Phytophthora infestans.") are hard for a small embedding model to retrieve.
 
 ### Caveats to state on stage
-- PlantVillage photos are lab images; field accuracy will be lower (not measured).
+- **Lab vs field:** 95.8% on PlantVillage lab photos, **54.8% on PlantDoc field photos**. The model
+  knows "diseased" but confuses the two blights, and the confidence threshold does not catch it.
+  Say this on the limitations slide; it is also the strongest argument for collecting field data.
 - Network times in D3 are modelled from stated profiles; phone measurements come with Stage E.
 - RAGAS on 5 questions with an 8B judge is directional, not a benchmark.
