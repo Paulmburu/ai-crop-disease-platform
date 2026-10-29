@@ -1,0 +1,88 @@
+{
+  "model": "llama3.1:8b",
+  "judge": "llama3.1:8b",
+  "summary": {
+    "faithfulness": 0.883,
+    "context_recall": 0.875,
+    "context_precision": 0.861,
+    "answer_accuracy": 0.75,
+    "failed_scores": 0
+  },
+  "rows": [
+    {
+      "question": "What causes late blight in potatoes?",
+      "answer": "Phytophthora infestans, a water mould (oomycete), not a true fungus [2].",
+      "grounded": true,
+      "sources": [
+        "potato_early_blight.md",
+        "potato_late_blight.md",
+        "potato_early_blight.md",
+        "potato_late_blight.md"
+      ],
+      "faithfulness": 1.0,
+      "context_recall": 1.0,
+      "context_precision": 0.5,
+      "answer_accuracy": 1.0
+    },
+    {
+      "question": "Under what weather conditions does potato late blight spread fastest?",
+      "answer": "High humidity (above about 90%) with moderate temperatures of roughly 10-26 \u00b0C (50-78 \u00b0F) [1]. Under these conditions, the disease spreads very rapidly.",
+      "grounded": true,
+      "sources": [
+        "potato_late_blight.md",
+        "potato_early_blight.md",
+        "potato_late_blight.md",
+        "potato_late_blight.md"
+      ],
+      "faithfulness": 1.0,
+      "context_recall": 1.0,
+      "context_precision": 0.806,
+      "answer_accuracy": 1.0
+    },
+    {
+      "question": "How can I recognise early blight on potato leaves?",
+      "answer": "Early blight on potato leaves is characterised by [1] circular to angular dark brown spots about 3-4 mm across with concentric rings that look like a target or bull's-eye, usually starting on older, lower leaves. These spots are dry and do not have white growth underneath.\n\nKey features of early blight lesions:\n\u2022 Circular to angular shape\n\u2022 Dark brown colour\n\u2022 Concentric rings\n\u2022 Dry appearance",
+      "grounded": true,
+      "sources": [
+        "potato_early_blight.md",
+        "potato_early_blight.md",
+        "potato_late_blight.md",
+        "potato_healthy.md"
+      ],
+      "faithfulness": 1.0,
+      "context_recall": 0.375,
+      "context_precision": 1.0,
+      "answer_accuracy": 0.75
+    },
+    {
+      "question": "How do I tell early blight from late blight on potato?",
+      "answer": "To distinguish between early blight and late blight, look for the following differences:\n\n* Early blight lesions are dry with concentric rings [2].\n* Late blight lesions are larger, water-soaked, and greasy-looking, with white growth on the leaf underside in humid weather [2].\n* White, fuzzy growth (sporulation) is more characteristic of late blight, especially on the leaf underside.",
+      "grounded": true,
+      "sources": [
+        "potato_early_blight.md",
+        "potato_early_blight.md",
+        "potato_early_blight.md",
+        "potato_late_blight.md"
+      ],
+      "faithfulness": 0.75,
+      "context_recall": 1.0,
+      "context_precision": 1.0,
+      "answer_accuracy": 0.5
+    },
+    {
+      "question": "What should I do to protect potato tubers from late blight before harvest?",
+      "answer": "To protect potato tubers from late blight before harvest, you should [1] kill the vines completely 2-3 weeks before harvest. This will help prevent the spread of the disease to the tubers.",
+      "grounded": true,
+      "sources": [
+        "potato_late_blight.md",
+        "potato_healthy.md",
+        "potato_early_blight.md",
+        "potato_early_blight.md"
+      ],
+      "faithfulness": 0.667,
+      "context_recall": 1.0,
+      "context_precision": 1.0,
+      "answer_accuracy": 0.5
+    }
+  ]
+}
