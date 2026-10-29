@@ -1,0 +1,14 @@
+graphify-out/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.env
+.DS_Store
+data/
+outputs/
+python-ml-service/models/*
+!python-ml-service/models/.gitkeep
+.chroma/
+.serena/
