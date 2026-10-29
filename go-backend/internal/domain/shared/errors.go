@@ -12,9 +12,10 @@ import (
 type Kind int
 
 const (
-	KindInvalid  Kind = iota + 1 // input breaks an invariant
-	KindNotFound                 // aggregate does not exist
-	KindConflict                 // state does not allow the operation
+	KindInvalid     Kind = iota + 1 // input breaks an invariant
+	KindNotFound                    // aggregate does not exist
+	KindConflict                    // state does not allow the operation
+	KindUnavailable                 // a dependency (e.g. ML or RAG service) cannot serve the request now
 )
 
 // Error is the single error type returned by domain and application code.
@@ -30,6 +31,9 @@ func (e *Error) Error() string { return fmt.Sprintf("%s: %s", e.Code, e.Message)
 func Invalid(code, msg string) *Error  { return &Error{Kind: KindInvalid, Code: code, Message: msg} }
 func NotFound(code, msg string) *Error { return &Error{Kind: KindNotFound, Code: code, Message: msg} }
 func Conflict(code, msg string) *Error { return &Error{Kind: KindConflict, Code: code, Message: msg} }
+func Unavailable(code, msg string) *Error {
+	return &Error{Kind: KindUnavailable, Code: code, Message: msg}
+}
 
 // As returns the domain error wrapped in err, if any.
 func As(err error) (*Error, bool) {

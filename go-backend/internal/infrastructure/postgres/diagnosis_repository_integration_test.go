@@ -16,9 +16,9 @@ import (
 )
 
 func TestDiagnosisRepository(t *testing.T) {
-	url := os.Getenv("DATABASE_URL")
+	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("DATABASE_URL not set")
+		t.Skip("TEST_DATABASE_URL not set")
 	}
 	ctx := context.Background()
 	pool, err := postgres.Connect(ctx, url)
@@ -68,9 +68,9 @@ func TestDiagnosisRepository(t *testing.T) {
 }
 
 func TestSaveManyAndPagination(t *testing.T) {
-	url := os.Getenv("DATABASE_URL")
+	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("DATABASE_URL not set")
+		t.Skip("TEST_DATABASE_URL not set")
 	}
 	ctx := context.Background()
 	pool, err := postgres.Connect(ctx, url)

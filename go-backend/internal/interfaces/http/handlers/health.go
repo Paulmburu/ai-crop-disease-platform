@@ -3,10 +3,11 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 )
 
-// Pinger checks a dependency (the database pool satisfies it).
+// Pinger checks a dependency (the database pool and the upstream clients satisfy it).
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
@@ -16,15 +17,33 @@ func Health(w http.ResponseWriter, _ *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// Ready: 200 only when the database answers within 2 s, else 503.
-func Ready(db Pinger) http.HandlerFunc {
+// Ready: 200 when the database answers (required). Optional dependencies (ML and
+// RAG services) are reported but do not fail readiness: the app uses them to
+// decide which online features to enable.
+func Ready(db Pinger, optional map[string]Pinger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
-		if err := db.Ping(ctx); err != nil {
-			WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "not_ready", "database": false})
+		body := map[string]any{"database": db.Ping(ctx) == nil}
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+		for name, p := range optional { // probe in parallel: /ready stays fast
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ok := p != nil && p.Ping(ctx) == nil
+				mu.Lock()
+				body[name] = ok
+				mu.Unlock()
+			}()
+		}
+		wg.Wait()
+		if body["database"] != true {
+			body["status"] = "not_ready"
+			WriteJSON(w, http.StatusServiceUnavailable, body)
 			return
 		}
-		WriteJSON(w, http.StatusOK, map[string]any{"status": "ready", "database": true})
+		body["status"] = "ready"
+		WriteJSON(w, http.StatusOK, body)
 	}
 }

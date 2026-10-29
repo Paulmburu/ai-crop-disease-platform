@@ -9,7 +9,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 
-	app "github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/application/diagnosis"
+	"github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/application/advice"
+	"github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/application/diagnosis"
+	"github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/application/modelrelease"
+	"github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/application/prediction"
 	"github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/interfaces/http/handlers"
 	"github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/interfaces/http/middleware"
 )
@@ -18,8 +21,13 @@ import (
 type Deps struct {
 	Log            *slog.Logger
 	DB             handlers.Pinger
-	Diagnoses      *app.Service
+	Upstreams      map[string]handlers.Pinger // reported in /ready, e.g. "ml_service", "rag_service"
+	Diagnoses      *diagnosis.Service
+	Releases       *modelrelease.Service
+	Predictions    *prediction.Service
+	Advice         *advice.Service
 	APIKeys        []string
+	AdminAPIKeys   []string // empty = admin endpoints disabled
 	RequestTimeout time.Duration
 	MaxBodyBytes   int64
 }
@@ -37,15 +45,38 @@ func NewRouter(d Deps) http.Handler {
 	})
 
 	r.Get("/health", handlers.Health)
-	r.Get("/ready", handlers.Ready(d.DB))
+	r.Get("/ready", handlers.Ready(d.DB, d.Upstreams))
+
+	dh := handlers.Diagnoses{Service: d.Diagnoses, Log: d.Log, MaxBodyBytes: d.MaxBodyBytes}
+	mh := handlers.ModelReleases{Service: d.Releases, Log: d.Log, MaxBodyBytes: d.MaxBodyBytes}
+	ph := handlers.Proxies{Predictions: d.Predictions, Advice: d.Advice, Log: d.Log}
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(chimw.Timeout(d.RequestTimeout), middleware.APIKey(d.APIKeys, handlers.WriteError))
-		dh := handlers.Diagnoses{Service: d.Diagnoses, Log: d.Log, MaxBodyBytes: d.MaxBodyBytes}
-		r.Post("/diagnoses", dh.Create)
-		r.Post("/diagnoses:sync", dh.Sync)
-		r.Get("/diagnoses/{id}", dh.Get)
-		r.Get("/devices/{device_id}/diagnoses", dh.History)
+		// App endpoints (phone API key).
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.APIKey(d.APIKeys, handlers.WriteError))
+			r.Group(func(r chi.Router) {
+				r.Use(chimw.Timeout(d.RequestTimeout)) // local work: short timeout
+				r.Post("/diagnoses", dh.Create)
+				r.Post("/diagnoses:sync", dh.Sync)
+				r.Get("/diagnoses/{id}", dh.Get)
+				r.Get("/devices/{device_id}/diagnoses", dh.History)
+				r.Get("/model-releases/latest", mh.Latest)
+			})
+			// No handler timeout: downloads on 2G and LLM answers are bounded by
+			// the server write timeout and the upstream client timeouts instead.
+			r.Get("/model-releases/{version}/artifact", mh.Artifact)
+			r.Post("/predictions", ph.Predict)
+			r.Post("/advice", ph.Ask)
+		})
+		// Admin endpoints (separate keys).
+		if len(d.AdminAPIKeys) > 0 {
+			r.Group(func(r chi.Router) {
+				r.Use(chimw.Timeout(d.RequestTimeout), middleware.APIKey(d.AdminAPIKeys, handlers.WriteError))
+				r.Post("/model-releases", mh.Publish)
+				r.Delete("/model-releases/{version}", mh.Withdraw)
+			})
+		}
 	})
 	return r
 }

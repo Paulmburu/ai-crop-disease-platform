@@ -25,15 +25,22 @@ type pinger struct{ err error }
 func (p pinger) Ping(context.Context) error { return p.err }
 
 func newServer(t *testing.T, db pinger) *httptest.Server {
+	return newServerWith(t, func(d *httpapi.Deps) { d.DB = db })
+}
+
+// newServerWith builds a server with in-memory defaults; edit adjusts them.
+func newServerWith(t *testing.T, edit func(*httpapi.Deps)) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(httpapi.NewRouter(httpapi.Deps{
+	d := httpapi.Deps{
 		Log:            slog.New(slog.NewTextHandler(io.Discard, nil)),
-		DB:             db,
+		DB:             pinger{},
 		Diagnoses:      app.NewService(app.NewMemoryRepository(), clock{}),
 		APIKeys:        []string{"test-key"},
 		RequestTimeout: 5 * time.Second,
 		MaxBodyBytes:   1 << 10,
-	}))
+	}
+	edit(&d)
+	srv := httptest.NewServer(httpapi.NewRouter(d))
 	t.Cleanup(srv.Close)
 	return srv
 }

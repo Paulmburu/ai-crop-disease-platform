@@ -35,9 +35,10 @@ func WriteError(w http.ResponseWriter, r *http.Request, status int, code, detail
 func WriteDomainError(log *slog.Logger, w http.ResponseWriter, r *http.Request, err error) {
 	if de, ok := shared.As(err); ok {
 		status := map[shared.Kind]int{
-			shared.KindInvalid:  http.StatusUnprocessableEntity,
-			shared.KindNotFound: http.StatusNotFound,
-			shared.KindConflict: http.StatusConflict,
+			shared.KindInvalid:     http.StatusUnprocessableEntity,
+			shared.KindNotFound:    http.StatusNotFound,
+			shared.KindConflict:    http.StatusConflict,
+			shared.KindUnavailable: http.StatusServiceUnavailable,
 		}[de.Kind]
 		if status == 0 {
 			status = http.StatusInternalServerError

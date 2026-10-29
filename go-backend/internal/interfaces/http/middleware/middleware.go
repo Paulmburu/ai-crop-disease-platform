@@ -10,9 +10,9 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
-)
 
-type ctxKey struct{}
+	"github.com/Paulmburu/ai-crop-disease-platform/go-backend/internal/application/reqctx"
+)
 
 // HeaderRequestID is shared with the Python services so one id follows a request everywhere.
 const HeaderRequestID = "X-Request-ID"
@@ -28,15 +28,12 @@ func RequestID(next http.Handler) http.Handler {
 			id = hex.EncodeToString(b)
 		}
 		w.Header().Set(HeaderRequestID, id)
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, id)))
+		next.ServeHTTP(w, r.WithContext(reqctx.WithRequestID(r.Context(), id)))
 	})
 }
 
 // GetRequestID returns the id stored by RequestID ("" if absent).
-func GetRequestID(ctx context.Context) string {
-	id, _ := ctx.Value(ctxKey{}).(string)
-	return id
-}
+func GetRequestID(ctx context.Context) string { return reqctx.RequestID(ctx) }
 
 type statusRecorder struct {
 	http.ResponseWriter
