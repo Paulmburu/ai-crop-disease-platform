@@ -10,7 +10,7 @@
 
 - A **Python FastAPI ML service** that accepts an image and returns `{"class": "leaf blight", "confidence": 0.91}`
 - A **Go API gateway** that handles uploads, auth, rate limiting, retries, and proxies to the Python service
-- A **RAG chatbot** (Phase 4 priority) that lets users ask "what causes this disease?" against a domain knowledge base
+- A **RAG chatbot** (Phase 3) that lets users ask "what causes this disease?" against a domain knowledge base
 - A **Flutter mobile app** with offline-first TFLite on-device inference
 - An **Android KMP module** that shares ML inference logic between Android and iOS natively
 
@@ -74,14 +74,14 @@ brew install node
 # Verify Flutter
 flutter doctor
 
-# Ollama — for local LLM in Phase 4 (RAG)
+# Ollama — for local LLM in Phase 3 (RAG)
 brew install ollama
 ollama pull llama3.2   # 3B model, runs well on M5
 ```
 
 ### Python project setup pattern
 
-Use this pattern for every Python service you create (Phase 2, Phase 4 RAG):
+Use this pattern for every Python service you create (Phase 2, Phase 3 RAG):
 
 ```bash
 # Create project with uv
@@ -122,8 +122,8 @@ Create one mono-repo for the entire project:
 ```
 ai-crop-disease-platform/
 ├── python-ml-service/       # Phase 2 — FastAPI + model
-├── go-gateway/              # Phase 3 — Go API
-├── rag-service/             # Phase 4 — RAG pipeline
+├── go-gateway/              # Phase 4 — Go API
+├── rag-service/             # Phase 3 — RAG pipeline
 ├── flutter-app/             # Phase 6 — Flutter mobile
 ├── android-kmp/             # Phase 7 — KMP shared module
 ├── docker-compose.yml       # runs all services locally
@@ -774,6 +774,11 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ### Why this is promoted to Priority 4
 
 AI engineer interviews in 2026 are 60%+ GenAI-focused. RAG, LLMs, prompt engineering, and agents dominate technical rounds. CNN knowledge now covers roughly 25% of what interviewers ask. Do not deprioritise this phase.
+
+> **Implemented differently.** The snippets below are the original LangChain + Gemini sketch and
+> no longer run as written: LangChain 1.x moved these imports, `vectorstore.persist()` no longer
+> exists, and `gemini-1.5-flash` is retired. The real, tested service is in `rag-service/`: chromadb
+> plus Ollama directly, no LangChain, no cloud key. See `docs/PHASE_3_RAG_PIPELINE.md`.
 
 ### Setup for this phase
 
