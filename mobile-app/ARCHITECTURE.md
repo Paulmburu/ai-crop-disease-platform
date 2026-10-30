@@ -170,7 +170,7 @@ deleted as one folder.
 - A `connectivity_plus` event only says an interface exists, so every change triggers `GET /ready` with a 2 s timeout before the app trusts the network.
 
 ### settings
-- **Backend:** base URL with presets (Android emulator `10.0.2.2:8080`, iOS simulator `localhost:8080`, LAN IP) and the API key.
+- **Backend:** base URL with presets (Android emulator `10.0.2.2:8080`, iOS simulator `localhost:8080`, LAN IP) and the API key (secure storage).
 - **Device:** `deviceId`, a UUID created on first run.
 - **Display:** theme mode and the reduce-motion override.
 - Settings are stored in a Hive box.
@@ -279,7 +279,7 @@ final class Unexpected extends Failure { final Object error; final String? reque
 |---|---|---|
 | `diagnoses` | `Map` per diagnosis (JSON-like), keyed by id | Sorted by `capturedAt` when read |
 | `outbox` | pending ids | Removed when the server answers created or duplicate |
-| `settings` | base URL, API key, deviceId, theme mode | |
+| `settings` | base URL, deviceId, theme mode | The API key lives in `flutter_secure_storage`, not Hive |
 | `model` | active version, sha, path, previous version | |
 
 - Values are plain maps, so there are no type adapters and no code generation.
@@ -375,6 +375,7 @@ Homebrew, so upgrade it with `brew upgrade --cask flutter`.
 | `uuid` | ^4.6.0 | Client-generated ids for idempotent sync |
 | `crypto` | ^3.0.8 | sha256 of downloaded models |
 | `path_provider` | ^2.1.6 | App directories |
+| `flutter_secure_storage` | ^11.2.0 | Access key in Keychain / Android Keystore (never in Hive) |
 | `animations` | ^3.0.0 | Material motion transitions |
 | `flutter_animate` | ^4.5.2 | In-widget effects (last release 2024-11; fall back to implicit animations if it breaks) |
 | dev: `very_good_analysis` | ^11.0.0 | Strict lints |
