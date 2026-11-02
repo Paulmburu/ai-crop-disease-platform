@@ -23,7 +23,7 @@ server for a second opinion and shows cited treatment advice, all through
 
 | Tool | Version | Install / check |
 |---|---|---|
-| Flutter | **3.47.9** stable (Dart 3.13) | Installed with Homebrew here: `brew upgrade --cask flutter`, then `flutter --version` |
+| Flutter | **3.41.6** (Dart 3.11.4), the installed version; no upgrade planned | `flutter --version` |
 | Android Studio | current, with SDK Platform 36, Build-Tools, NDK **r28+**, CMake | `flutter doctor --android-licenses` |
 | Android emulator | Pixel 7-class, API 35/36, **plus one 16 KB page-size image** (to check the LiteRT native library) | Device Manager in Android Studio |
 | Xcode | 26.x with an iOS 18+ simulator (iOS is secondary for the talk) | `xcode-select -p`, `pod --version` |
@@ -86,6 +86,6 @@ curl -X POST localhost:8080/api/v1/model-releases -H 'X-API-Key: dev-admin-key' 
 ## Design workflow
 
 1. Generate the screens in Google Stitch with [`design/STITCH_PROMPTS.md`](design/STITCH_PROMPTS.md).
-2. Export DESIGN.md, the HTML and the PNGs into `design/export/`.
-3. The Flutter theme (`lib/app/theme/`) takes its tokens from `design/export/DESIGN.md`. The PNGs are
+2. Export DESIGN.md, the HTML and the PNGs into `designs/` (done).
+3. The Flutter theme (`lib/ui/theme/`) takes its tokens from `designs/field_diagnostic_tool/DESIGN.md`. The PNGs are
    visual references for widget tests.

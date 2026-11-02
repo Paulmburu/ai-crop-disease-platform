@@ -358,15 +358,21 @@ The app is used **outdoors, in bright sun, often one-handed**, so contrast and l
 
 Latest versions checked on pub.dev on 2026-10-30.
 
-**Prerequisite:** the local Flutter is 3.41.6. Current stable is **3.47.9 (Dart 3.13.7)**. Several
-packages below need Flutter ≥ 3.44 or Dart ≥ 3.12, so upgrade first. Flutter was installed with
-Homebrew, so upgrade it with `brew upgrade --cask flutter`.
+**Toolchain decision (2026-10-30):** stay on the installed **Flutter 3.41.6 / Dart 3.11.4**. Current stable is 3.47.9, but
+we don't upgrade. Use the newest package versions whose SDK constraint allows 3.41.6. The UI-phase
+versions are pinned in [`docs/UI_IMPLEMENTATION.md`](docs/UI_IMPLEMENTATION.md) §2:
+- `flutter_riverpod` ^3.3.2
+- `go_router` ^17.5.0
+- `animations` ^2.2.0
+- `very_good_analysis` ^10.2.0
+
+The versions in the table below are the latest; re-check each data package against 3.41.6 when it is added in F1/F2.
 
 | Package | Version | Purpose |
 |---|---|---|
-| `flutter_riverpod` | ^3.4.3 | State management + DI |
-| `go_router` | ^18.1.2 | Routing, tab shell |
-| `tflite_flutter` | ^0.12.1 | LiteRT interpreter (official `tensorflow.org` publisher). Fallback: `flutter_litert` ^3.9.4 (community, more active) if it fails on the current toolchain |
+| `flutter_riverpod` | ^3.3.2 (on 3.41.6) | State management + DI |
+| `go_router` | ^17.5.0 (on 3.41.6) | Routing, tab shell |
+| `flutter_litert` | ^3.9.4 | LiteRT interpreter (community, released 2026-10, bundles native libraries; the package the talk names). Fallback: `tflite_flutter` ^0.12.1 (official, last released 2025-10) |
 | `image` | ^4.12.0 | Decode, EXIF orientation, resize, crop |
 | `image_picker` | ^1.2.4 | Camera + gallery |
 | `hive_ce` / `hive_ce_flutter` | ^2.22.0 / ^2.5.0 | Local storage (maintained fork of Hive) |
@@ -422,7 +428,7 @@ Each milestone is one commit on `feature/flutter-app`.
 
 | Item | Risk | Mitigation |
 |---|---|---|
-| `tflite_flutter` last released 2025-10 | Build problems with the newest Android/iOS toolchains | Try it in F1 first; switch to `flutter_litert` behind the same `Classifier` port |
+| `flutter_litert` is community-maintained | Releases could stop | Check 16 KB alignment in F1; `tflite_flutter` can replace it behind the same `Classifier` port |
 | Preprocessing drift | Silent accuracy loss | Golden test against a Python fixture |
 | Field photos | 54.8% on PlantDoc vs 95.8% lab | Uncertain state + retake tips; say it on the limitations slide |
 | Cleartext HTTP in the demo | Android/iOS block it by default | Debug-only network config (Android `usesCleartextTraffic` in the debug manifest, iOS `NSAllowsLocalNetworking`) |

@@ -17,8 +17,8 @@ app/ (composition root) wires everything
 |---|---|---|
 | `features/*/domain` | `dart:core` libraries, `package:meta`, `lib/core` | Flutter, any other package, other layers |
 | `features/*/application` | its domain, other features' domain types, `lib/core` | Flutter, infrastructure, presentation |
-| `features/*/infrastructure` | domain, application, packages (dio, hive_ce, tflite_flutter, …) | presentation |
-| `features/*/presentation` | application, domain types, Flutter, Riverpod, `lib/app/theme` | infrastructure, dio, hive, tflite |
+| `features/*/infrastructure` | domain, application, packages (dio, hive_ce, flutter_litert, …) | presentation |
+| `features/*/presentation` | application, domain types, Flutter, Riverpod, `lib/ui/theme` | infrastructure, dio, hive, tflite |
 | `lib/app` | everything | – |
 
 `test/architecture_test.dart` enforces this table. Never weaken it to make a change pass.
@@ -49,8 +49,8 @@ app/ (composition root) wires everything
   sealed classes, records and hand-written `toMap`/`fromMap`.
 - **Providers** are declared only in `lib/app/providers.dart`. Notifiers depend on use cases, never
   on adapters. Tests use `ProviderScope(overrides: …)`.
-- **Theme:** colours, text styles, spacing, radius and motion come only from `lib/app/theme/`, whose
-  tokens are copied from `design/export/DESIGN.md`. No raw `Color(0x…)` or durations in widgets.
+- **Theme:** colours, text styles, spacing, radius and motion come only from `lib/ui/theme/`, whose
+  tokens are copied from `designs/field_diagnostic_tool/DESIGN.md`. No raw `Color(0x…)` or durations in widgets.
 - **Diagnosis status** is always icon + label + colour (`DiagnosisColors` extension).
 - **Motion:** use the tokens in `motion.dart`. Every animation checks `MediaQuery.disableAnimationsOf(context)`
   and the reduce-motion setting.

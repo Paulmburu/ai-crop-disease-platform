@@ -17,15 +17,15 @@ flowchart LR
 ## D0: Design
 - Docs: README, PRD, ARCHITECTURE, ROADMAP, PROGRESS, AGENTS, STITCH_PROMPTS.
 - Stitch: all screens from `design/STITCH_PROMPTS.md` §4 generated and reviewed (§7 checklist);
-  export to `design/export/`.
+  export to `designs/`.
 - **Done when:** the exports exist, and every PRD requirement has a screen state or is marked "no UI".
 
 ## F0: Scaffold
-- Toolchain: Flutter 3.47.9 (`brew upgrade --cask flutter`), `flutter doctor` clean.
+- Toolchain: the installed Flutter 3.41.6, `flutter doctor` clean. UI with mock data first, per [`UI_IMPLEMENTATION.md`](UI_IMPLEMENTATION.md).
 - `flutter create --org com.paulmburu --platforms android,ios mobile-app`.
 - Android: minSdk 26, targetSdk 36. iOS: 15.0.
 - `analysis_options.yaml` with very_good_analysis; the folder layout from ARCHITECTURE §4.
-- `core/` (`Result`, `Failure`, `Clock`); theme, motion and diagnosis colours from `design/export/DESIGN.md`; bundled Inter.
+- `core/` (`Result`, `Failure`, `Clock`); theme, motion and diagnosis colours from `designs/field_diagnostic_tool/DESIGN.md`; bundled Inter.
 - go_router shell with 3 empty tabs; `test/architecture_test.dart`.
 - Platform config:
   - Android: camera/media permissions, debug-only `network_security_config.xml` allowing cleartext to `10.0.2.2` and LAN ranges.
@@ -37,7 +37,7 @@ flowchart LR
 - Preprocessing in an isolate, plus a **golden test**:
   - add `python-ml-service/scripts/export_preprocess_fixture.py`, which writes the tensor for one test image to `mobile-app/test/fixtures/`
   - the Dart output must match within 1e-4 (max abs diff)
-- `LiteRtClassifier` (`tflite_flutter`). If it fails to build or isn't 16 KB aligned, swap in `flutter_litert` behind the same port.
+- `LiteRtClassifier` (`flutter_litert`). If it fails to build or isn't 16 KB aligned, swap in `tflite_flutter` behind the same port.
 - `tool/check_16kb.dart` checks the alignment of the `.so` files in the release APK. Also run on a 16 KB emulator.
 - Hive boxes with `schemaVersion`; `HiveDiagnosisRepository`; photo copy and delete.
 - Screens S1-A/C, S1a, S2, S3-A/B/C/D, S5-A/C.

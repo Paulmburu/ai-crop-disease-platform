@@ -15,8 +15,8 @@ The model is a prop; the architecture is the product.
 | Potato: early blight, late blight, healthy | Other crops, field-photo validation (PlantDoc) |
 | One baseline model (frozen backbone) | Full fine-tuning, hyperparameter search, quantisation |
 | Confidence threshold ("retake photo") | Out-of-distribution detection, calibration |
-| `/predict`, `/ready`, `/ask` contracts | Go gateway, auth, CI/CD, RAG in Docker, full RAGAS |
-| Python-side benchmarks | Flutter app (separate stage, later) |
+| `/predict`, `/ready`, `/ask` contracts; Go gateway (go-backend M0–M3) | auth beyond API keys, CI/CD, full RAGAS |
+| Python-side benchmarks; Flutter app UI on mock data (LeafCheck) | Phone benchmarks (after F1: real LiteRT) |
 
 ## Architecture rule
 **Diagnosis always runs on the phone. The network only adds advice (RAG), history sync and model updates.**
@@ -82,6 +82,8 @@ After each stage, all three projects pass `uv run ruff check . && uv run pytest`
 
 ## From work to slides
 
+**The full slide-by-slide outline, template and screenshots are in [`PRESENTATION_SLIDES.md`](PRESENTATION_SLIDES.md).** The table below is the original mapping.
+
 | Slide | Source |
 |---|---|
 | Why offline-first | D3, D5 |
@@ -111,8 +113,8 @@ After each stage, all three projects pass `uv run ruff check . && uv run pytest`
 | B4 Contract | ✅ | `docs/API_CONTRACT.md` (real responses) |
 | C1–C3 RAG | ✅ | 3 potato notes, 17 chunks. RAGAS (5 Qs, 8B judge): faithfulness 0.51 → **0.88** after two fixes |
 | Field photos (PlantDoc) | ✅ | 221 potato field photos: accuracy **54.8%** (lab 95.8%); early blight recall 38.8%; threshold still answers 86% of them at 55% accuracy |
-| D Benchmarks | ✅ | `benchmarks/results.md`: on-device **1.8 ms** vs backend 18 ms server time; modelled 3 MB photo upload ≈ 34 s on 3G, ≈ 4 min on 2G; RAG warm ≈ 3.3 s |
-| E Flutter app | ⏳ | Not started (by design) |
+| D Benchmarks | ✅ | `benchmarks/results.md`: on-device **1.9 ms** vs backend 18 ms server time; modelled 3 MB photo upload ≈ 34 s on 3G, ≈ 4 min on 2G; RAG warm ≈ 3.5 s |
+| E Flutter app | 🟡 | UI done on mock data (`mobile-app/`, 91 tests); LiteRT + Hive next (F1) |
 
 ### What moved the RAG scores (5 potato questions, local llama3.1:8b judge)
 

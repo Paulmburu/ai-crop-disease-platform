@@ -12,3 +12,6 @@ python-ml-service/models/*
 !python-ml-service/models/.gitkeep
 .chroma/
 .serena/
+mobile-app/designs/
+# Regenerable 3x slide screenshots (see docs/presentation/build_deck.py)
+docs/presentation/screens/
