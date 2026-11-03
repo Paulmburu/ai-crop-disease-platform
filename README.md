@@ -75,6 +75,7 @@ Key rules:
 | [`python-ml-service/`](python-ml-service/README.md) | 2 | FastAPI inference service + TFLite export for mobile | FastAPI, PyTorch, LiteRT | [README](python-ml-service/README.md) |
 | [`rag-service/`](rag-service/README.md) | 3 | Cited treatment advice from curated notes | FastAPI, ChromaDB, Ollama | [README](rag-service/README.md) |
 | [`go-backend/`](go-backend/README.md) | 4 | Gateway: diagnosis sync, history, model releases, prediction/advice proxies | Go, chi, PostgreSQL (DDD layers) | [README](go-backend/README.md) |
+| [`mobile-app/`](mobile-app/README.md) | 6 | LeafCheck Flutter app: UI for every screen on mock data behind real ports; LiteRT (`flutter_litert`) + Hive next | Flutter 3.41, Riverpod, go_router | [README](mobile-app/README.md) |
 | [`benchmarks/`](benchmarks/results.md) | – | On-device vs backend latency, model size, RAG latency | Python script | [results](benchmarks/results.md) |
 | [`docs/`](docs/) | – | Phase guides, API contract, presentation plan | Markdown + Mermaid | [index](#documentation-index) |
 | `docker-compose.yml` | – | Runs postgres, ml-service, rag-service, go-backend together | Docker Compose | below |
@@ -311,6 +312,9 @@ Every service reads environment variables. See each `.env.example` and README fo
 | [`docs/PHASE_7_ANDROID_KMP.md`](docs/PHASE_7_ANDROID_KMP.md) | Android / KMP (planned) |
 | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | What the mobile app can rely on, with real responses |
 | [`docs/PRESENTATION_PLAN.md`](docs/PRESENTATION_PLAN.md) | Talk plan, demo script, results |
+| [`docs/PRESENTATION_SLIDES.md`](docs/PRESENTATION_SLIDES.md) | Slide-by-slide outline; deck in [`docs/presentation/`](docs/presentation/) |
+| [`docs/PRESENTATION_SPEAKER_GUIDE.md`](docs/PRESENTATION_SPEAKER_GUIDE.md) | How to present each slide, demo runbook, Q&A bank, resources |
+| [`mobile-app/`](mobile-app/README.md) | Flutter app: architecture, PRD, roadmap, UI implementation |
 | [`go-backend/docs/`](go-backend/docs/) | PRD, roadmap, progress for the Go backend; [`AGENTS.md`](go-backend/AGENTS.md) for contributors |
 
 `docs/sync_code_blocks.py` keeps code snippets in the phase docs in sync with the real source files.
@@ -325,4 +329,6 @@ Every service reads environment variables. See each `.env.example` and README fo
 | Phase 4 go-backend M0–M3 (sync, history, model releases, gateway) | ✅ done |
 | Benchmarks | ✅ done |
 | go-backend M4 hardening (rate limits, metrics, OpenAPI), CI | ⏳ after the talk |
-| Flutter app (Phase 6) | ⏳ next |
+| Flutter app (Phase 6): UI on mock data, 91 tests, goldens | ✅ done |
+| Flutter app F1–F2: on-device LiteRT, Hive, real sync | ⏳ next |
+| Talk deck + speaker guide | ✅ done |
