@@ -2,6 +2,7 @@
 
 The slide-by-slide outline for the talk, the PowerPoint template to build it in, and where every
 screenshot and number comes from. Background and progress: [`PRESENTATION_PLAN.md`](PRESENTATION_PLAN.md).
+How to present each slide, with links to share: [`PRESENTATION_SPEAKER_GUIDE.md`](PRESENTATION_SPEAKER_GUIDE.md).
 
 **Session:** FlutterconKE, Flutter AI / Mobile track, Advanced, **40 min** (≈35 min talk + 5 min Q&A).
 **Speakers:** Paul Mburu (Mobile Engineer, Pezesha · @paulnm) and Titus Kariuki (Mobile Developer, Volane International).
@@ -48,13 +49,14 @@ Layout rules:
 |---|---|---|---|---|
 | 1 Why on-device | 1–3 | 4 min | Paul | – |
 | 2 Where the model comes from | 4–5 | 4 min | Paul | ML training + `python-ml-service` |
-| 3a On-device AI in Flutter ★ | 6–11 | 10 min | Paul | **Flutter** (`flutter_litert`, preprocessing, abstain) |
+| 3a On-device AI in Flutter ★ | 6–11 | 10 min | Titus | **Flutter** (`flutter_litert`, preprocessing, abstain) |
 | 3b Offline-first Flutter ★ | 12–15 | 6 min | Titus | **Flutter** (Hive, `connectivity_plus`, outbox, design system, tests) |
-| 4 Coming back online | 16–20 | 6 min | Titus | `go-backend` + `rag-service` (shown through the app) |
-| 5 Demo and honesty | 21–23 | 5 min | Both (one drives the phone, one narrates) | Flutter |
+| 4 Coming back online | 16–18 | 4 min | Titus | `go-backend` (shown through the app) |
+| 4 What to do about it | 19–20 | 2 min | Paul | `rag-service` |
+| 5 Demo and honesty | 21–23 | 5 min | Titus drives the demo, Paul narrates and takes limitations | Flutter |
 | Q&A | 24 | 5 min | Both | – |
 
-One handover only (slide 11 → 12), so the story isn't interrupted. The speaker split is a proposal; agree it with Titus.
+Paul covers the ML service and RAG; Titus covers the Flutter app and the Go service. Two handovers: 5 → 6 and 18 → 19.
 
 On service slides the **left half is the Flutter screen** and the right half is the service behind it.
 
@@ -103,10 +105,11 @@ Screenshot paths are relative to `mobile-app/test/goldens/` unless noted. ★ = 
 ### Act 5: Demo and honesty
 | # | Title | Say / show | Visual | Source |
 |---|---|---|---|---|
-| 21 | Live demo | Airplane mode on → scan late-blight leaf → result in ms → History "Pending" → Wi-Fi on → "Synced" → Get advice (cited) | Phone mirrored; **backup screen recording** | – |
+| 21 | Live demo | Two emulators (mock UI): offline phone scan → Pending · blurry → Not sure · online phone Sync now → Synced · Get advice · then the real `curl` to go-backend `/advice` | `s1_b_scan_offline` · `s5_b_history_syncing` + code box; **backup screen recording** | `PRESENTATION_SPEAKER_GUIDE.md` demo runbook |
 | 22 | Limitations | **95.8%** lab photos vs **54.8%** on 221 PlantDoc field photos; the model knows "diseased" (0.9% of diseased leaves called healthy) but confuses the two blights, and the threshold doesn't catch it (answers 86%, at 55%); phone benchmarks still to measure | Two big numbers + `s7_c_speed_test` ("where phone numbers will appear") | `ml-training/outputs/field_eval.json` |
 | 23 | Five takeaways | 1. Measure the network cost. 2. Preprocessing is part of the model. 3. Let the model abstain. 4. Write first, sync idempotently. 5. Verify every update. | Text only | – |
-| 24 | Thank you / Q&A | Repo link, contact. Backup slides after this: API contract, RAGAS table, full mismatch table | Splash icon | – |
+| 24 | Thank you / Q&A | Both names; no repo link | Splash icon | – |
+| 25 | Backup · What is real today | Real vs mock, shown only if asked | Two-column table | guide "What is real today" |
 
 ---
 

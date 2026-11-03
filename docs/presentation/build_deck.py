@@ -11,6 +11,7 @@ Run:  python3 -m venv /tmp/pptvenv && /tmp/pptvenv/bin/pip install python-pptx p
 Fonts: Gothic A1 and JetBrains Mono (Google Fonts, OFL) must be installed on the presenting machine.
 """
 
+import re
 from pathlib import Path
 
 from lxml import etree
@@ -219,7 +220,7 @@ def bullets(s, x, y, w, items, size=19, color=INK, gap=0.12):
 B = {"bold": True}
 
 # ══ Act 1: Why on-device (Paul) ══════════════════════════════════════════
-s = new_slide(WHITE, notes="Welcome. Two of us: Paul (on-device AI) then Titus (offline-first, backend). "
+s = new_slide(WHITE, notes="Welcome. Two of us: Paul (ML service and RAG) and Titus (the Flutter app and the Go service). "
               "One app, LeafCheck: diagnoses potato leaves with no internet.")
 text(s, 0.7, 0.45, 11, 0.3, "FlutterconKE · Flutter AI / Mobile · Advanced · 40 min", 13, MUTED)
 text(s, 0.7, 0.8, 12, 1.4, ["Beyond the API Call: On-Device AI in Flutter",
@@ -249,15 +250,15 @@ s = new_slide(WHITE, PAUL, "Same 3 MB photo. On the phone: 1.9 ms. Through a bac
               "trip. Network times are modelled from stated profiles, not measured on a phone — say so.")
 title(s, "The cost of the API call", sub="One 3 MB leaf photo to a backend vs. the same model on the phone")
 for i, (big, lab, sub, fill, col) in enumerate([
-        ("1.9 ms", "On the phone", "LiteRT, p50", PALE_LEAF, LEAF),
+        ("1.9 ms", "On-device (LiteRT)", "laptop CPU, p50 · phone TBD", PALE_LEAF, LEAF),
         ("1.3 s", "Wi-Fi", "upload + RTT", MINT, DARK),
         ("34 s", "3G", "upload + RTT", MINT, DARK),
         ("4 min", "2G (EDGE)", "upload + RTT", MINT, DARK)]):
     numbox(s, 0.7 + i * 3.03, 2.6, 2.8, 2.3, big, lab, sub, fill, col, 54)
-text(s, 0.7, 5.4, 11, 0.4, "Network times modelled from stated profiles · benchmarks/results.md D2, D3",
+text(s, 0.7, 5.4, 11, 0.4, "1.9 ms measured on a laptop CPU; network times modelled from stated profiles · benchmarks/results.md D2, D3",
      13, MUTED)
 
-# ══ Act 2: Where the model comes from (Paul) ═════════════════════════════
+# ══ Act 2: Where the model comes from (Paul: ML service) ═════════════════════════════
 s = new_slide(MINT, PAUL, "2,152 potato images; healthy is the minority (152, 6.6x fewer). MobileNetV2 "
               "with a frozen base trains in about 40 s. 95.8% accuracy, macro F1 0.945 on 216 test images.")
 title(s, "Data → model")
@@ -289,13 +290,15 @@ code(s, 0.7, 4.95, 6.0, 1.75, '{ "input_shape": [1, 224, 224, 3],\n  "input_layo
      '  "class_names": ["…Early_blight", "…Late_blight", "…healthy"],\n  "confidence_threshold": 0.5 }',
      12)
 
-# ══ Act 3a: On-device AI in Flutter (Paul) ═══════════════════════════════
-s = new_slide(WHITE, PAUL, "The app: scan offline, see the result, keep a history, control settings.")
+# ══ Act 3a: On-device AI in Flutter (Titus) ═══════════════════════════════
+s = new_slide(WHITE, TITUS, "Handover: Paul → Titus. The app: scan offline, see the result, keep a history, control settings.")
 title(s, "The app at a glance")
+text(s, 7.0, 0.95, 5.6, 0.4, "UI on mock adapters behind real ports · model, Go and RAG are real", 13, MUTED,
+     align=PP_ALIGN.RIGHT)
 phones(s, ["s1_a_scan_online", "s3_a_result_late_blight", "s5_a_history_1", "s7_a_settings"], 1.75, 5.0,
        captions=["Scan", "Result", "History", "Settings"])
 
-s = new_slide(MINT, PAUL, "flutter_litert sits behind a Classifier port. Domain is pure Dart; "
+s = new_slide(MINT, TITUS, "flutter_litert sits behind a Classifier port. Domain is pure Dart; "
               "presentation reads use cases only; providers.dart is the single wiring point; "
               "an architecture test fails the build if a layer imports the wrong thing.")
 title(s, "Clean layers in Flutter")
@@ -313,13 +316,13 @@ code(s, 9.6, 1.95, 3.3, 3.4, "// app/di/providers.dart\nfinal classifierProvider
      "    DiagnoseLeaf(\n      classifier: ref.watch(\n        classifierProvider),\n"
      "      …));", 10.5)
 
-s = new_slide(WHITE, PAUL, "Pick a photo, then inference runs in an isolate. The result is saved before "
+s = new_slide(WHITE, TITUS, "Pick a photo, then inference runs in an isolate. The result is saved before "
               "it is shown. The scan line is held at least 600 ms so the user can read it.")
 title(s, "Capture → analyze")
 phones(s, ["s1a_a_photo_source", "s2_a_analyzing_start", "s2_b_analyzing_end"], 1.75, 5.0, gap=0.9,
-       captions=["Photo source", "Inference in an isolate", "Saved, then shown (≥ 600 ms)"])
+       captions=["Photo source", "Off the UI thread", "Saved, then shown (≥ 600 ms)"])
 
-s = new_slide(MINT, PAUL, "Same model, same photos. Forget the divide by 255 and 210 of 216 leaves "
+s = new_slide(MINT, TITUS, "Same model, same photos. Forget the divide by 255 and 210 of 216 leaves "
               "come back 'healthy' — 9.3%. Swap red and blue: 55.6%. No exception anywhere. The fix is a "
               "golden test: Dart tensor vs Python fixture, max diff 1e-4.")
 title(s, "The silent bug", w=6)
@@ -339,13 +342,13 @@ for i, (lab, sub, big, col) in enumerate([("Correct preprocessing", None, "95.8%
     text(s, 10.0, y + 0.1, 2.4, 0.95, big, 40, col, TITLE_FONT, PP_ALIGN.RIGHT, MSO_ANCHOR.MIDDLE)
 text(s, 7.2, 6.1, 5.4, 0.3, "ml-training/outputs/mismatch.json", 11, MUTED)
 
-s = new_slide(WHITE, PAUL, "Confidence bar with the threshold tick; top-3 underneath; on-device latency "
+s = new_slide(WHITE, TITUS, "Confidence bar with the threshold tick; top-3 underneath; on-device latency "
               "and model version. Status is always icon + label + colour, never colour alone.")
 title(s, "Show the answer honestly")
 phones(s, ["s3_a_result_late_blight", "s3_c_result_early_blight", "s3_b_result_healthy"], 1.75, 5.0, gap=0.9,
        captions=["Late blight · 76.5%", "Early blight", "Healthy"])
 
-s = new_slide(MINT, PAUL, "Threshold 0.50: the model answers 96.3% of test photos and is right 97.1% of the "
+s = new_slide(MINT, TITUS, "Threshold 0.50: the model answers 96.3% of test photos and is right 97.1% of the "
               "time when it answers. Below the threshold it says 'Not sure, retake' and shows its best guess.")
 title(s, "Don’t guess: abstain", w=5.5)
 numbox(s, 0.7, 2.2, 2.6, 1.6, "96.3%", "photos answered", fill=WHITE, big_size=40)
@@ -357,7 +360,7 @@ phones(s, ["s3_a_result_late_blight", "s3_d_result_not_sure_1"], 1.0, 5.6, x0=6.
        captions=["Confident · 76.5%", "Not sure · 38.9%"])
 
 # ══ Act 3b: Offline-first Flutter (Titus) ════════════════════════════════
-s = new_slide(DARK, TITUS, "Handover: Paul → Titus. Scanning is never disabled. 'Online' means GET /ready "
+s = new_slide(DARK, TITUS, "Scanning is never disabled. 'Online' means GET /ready "
               "answered within 2 s, not just connectivity_plus saying there's Wi-Fi.")
 title(s, "Offline is the default", color=ON_DARK, w=5.5)
 bullets(s, 0.7, 2.1, 5.4, [
@@ -410,7 +413,7 @@ text(s, 0.7, 5.0, 3.7, 1.8, ["Text contrast 4.18:1", "Crash under reduce motion"
 phones(s, ["s3_c_result_early_blight", "s4_e_advice_unavailable", "dark/s3_a_result_late_blight"], 1.75,
        4.9, x0=4.6, gap=0.4, captions=["Light golden", "Light golden", "Dark golden"])
 
-# ══ Act 4: Coming back online (Titus) ════════════════════════════════════
+# ══ Act 4: Coming back online (Titus: Go; Paul: RAG from slide 19) ════════════════════════════════════
 s = new_slide(MINT, TITUS, "The app talks to one service only: go-backend. It owns sync, history, model "
               "releases, and proxies predictions and advice to the Python services. Same DDD layering as the app.")
 phone(s, "s7_b_diagnostics_2", 0.7, 0.9, 5.7)
@@ -442,7 +445,7 @@ bullets(s, 0.7, 1.95, 6.0, ["Phone 76.5% vs server 81.2%",
 text(s, 0.7, 5.6, 6, 0.3, "Mock values today · live via /api/v1/predictions", 11, MUTED)
 phone(s, "s3_e_result_second_opinion", 8.3, 0.7, 6.1)
 
-s = new_slide(WHITE, TITUS, "rag-service: curated notes → retrieval → local LLM; answers cite [n] sources. "
+s = new_slide(WHITE, PAUL, "Handover: Titus → Paul. rag-service: curated notes → retrieval → local LLM; answers cite [n] sources. "
               "Faithfulness went 0.51 → 0.88 after two fixes: no padding rule in the prompt, self-contained "
               "'Cause' sentences in the notes. Warm answer ~3.5 s, so it's an add-on, never blocking.")
 title(s, "“What do I do about this?”", w=6.4, size=34)
@@ -454,7 +457,7 @@ text(s, 0.7, 4.9, 6.0, 1, "Fixes: no “padding” rule in the prompt · self-co
      "notes", 13, MUTED)
 phones(s, ["s4_a_advice_questions", "s4_c_advice_answer"], 1.0, 5.6, x0=6.9, gap=0.4)
 
-s = new_slide(MINT, TITUS, "The same curated notes the RAG service retrieves from are bundled in the app as "
+s = new_slide(MINT, PAUL, "The same curated notes the RAG service retrieves from are bundled in the app as "
               "a disease library, so the knowledge works offline too.")
 title(s, "Same knowledge, offline", w=5.6, size=34)
 bullets(s, 0.7, 1.95, 5.2, ["The RAG notes ship inside the app",
@@ -464,16 +467,19 @@ text(s, 0.7, 5.6, 5.2, 0.3, "mobile-app/assets/knowledge/", 11, MUTED)
 phones(s, ["s9_a_disease_library", "s9_b_late_blight"], 1.0, 5.6, x0=6.0, gap=0.6)
 
 # ══ Act 5: Demo and honesty (both) ═══════════════════════════════════════
-s = new_slide(DARK, BOTH, "One drives the phone, one narrates. Backup: screen recording on the laptop.")
+s = new_slide(DARK, BOTH, "Titus drives the phone, Paul narrates. Backup: screen recording on the laptop.")
 title(s, "Live demo", color=ON_DARK, w=6)
-bullets(s, 0.7, 2.0, 6.0, ["① Airplane mode on", "② Scan a late-blight leaf → result in ms",
-                           "③ History shows “Pending”", "④ Wi-Fi on → “Synced”",
-                           "⑤ Get advice, with sources"], 22, ON_DARK)
-text(s, 0.7, 6.3, 6, 0.3, "Backup: screen recording", 12, ON_DARK_MUTED)
+bullets(s, 0.7, 1.9, 6.0, ["① Offline phone: scan → “Pending”", "② Blurry photo → “Not sure”",
+                           "③ Online phone: Sync now → “Synced”", "④ Get advice, with sources",
+                           "⑤ The real call behind it:"], 19, ON_DARK, gap=0.08)
+code(s, 0.7, 5.05, 6.0, 0.95, "curl -X POST localhost:8080/api/v1/advice \\\n"
+     "  -d '{\"question\": \"What should I do today?\"}'", 12)
+text(s, 0.7, 6.3, 6, 0.3, "UI runs on mock adapters today · backup: screen recording", 12, ON_DARK_MUTED)
 rect(s, 7.0, 0, 6.333, 7.5, MINT)
-phones(s, ["s1_b_scan_offline", "s5_b_history_syncing"], 0.9, 5.6, x0=7.0, gap=0.5)
+phones(s, ["s1_b_scan_offline", "s5_b_history_syncing"], 0.9, 5.6, x0=7.0, gap=0.5,
+       captions=["Phone 1 · offline", "Phone 2 · online"])
 
-s = new_slide(WHITE, BOTH, "95.8% on lab photos, 54.8% on 221 PlantDoc field photos. The model knows "
+s = new_slide(WHITE, PAUL, "95.8% on lab photos, 54.8% on 221 PlantDoc field photos. The model knows "
               "'diseased' (only 0.9% of diseased leaves called healthy) but confuses the two blights, and the "
               "threshold doesn't catch it: it still answers 86% of field photos, at 55%. Phone benchmarks are "
               "still to be measured; the speed test screen is where they'll appear.")
@@ -502,8 +508,28 @@ image(s, ROOT / "mobile-app/assets/splash/splash_icon.png", 5.92, 1.0, h=1.5)
 rule(s, 5.87, 3.0, 1.6, ON_DARK)
 text(s, 0.7, 3.2, 11.93, 1, "Any questions?", 48, ON_DARK, TITLE_FONT, PP_ALIGN.CENTER)
 text(s, 0.7, 4.35, 11.93, 0.4, f"{PAUL} · {TITUS}", 20, ON_DARK, align=PP_ALIGN.CENTER)
-text(s, 0.7, 4.85, 11.93, 0.4, "github.com/Paulmburu/ai-crop-disease-platform", 14, ON_DARK_MUTED,
-     align=PP_ALIGN.CENTER)
+
+# ══ Backup (after Q&A) ═══════════════════════════════════════════════════
+s = new_slide(WHITE, BOTH)
+title(s, "Backup · What is real today")
+for i, (head, items, fill) in enumerate([
+        ("Real, measured", ["Trained model, eval and field numbers", ".tflite export, 1.9 ms laptop benchmark",
+                            "go-backend: sync, model releases, proxies", "rag-service with cited answers, RAGAS",
+                            "Flutter UI, 91 tests, goldens"], PALE_LEAF),
+        ("Mock, behind the real ports", ["In-app inference (LiteRT in F1)", "Local storage and sync (F1/F2)",
+                                         "Online/offline = SCENARIO flag", "Second-opinion numbers"], MINT)]):
+    x = 0.7 + i * 6.1
+    rect(s, x, 1.9, 5.8, 4.6, fill)
+    text(s, x + 0.35, 2.15, 5.2, 0.5, head, 22, DARK, TITLE_FONT)
+    bullets(s, x + 0.35, 2.85, 5.2, items, 17, gap=0.1)
+
+# Speaker notes come from docs/PRESENTATION_SPEAKER_GUIDE.md, so the presenter view matches the guide.
+GUIDE = (HERE.parent / "PRESENTATION_SPEAKER_GUIDE.md").read_text()
+for m in re.finditer(r"^### (\d+)\. .*?\n(.*?)(?=^#{2,3} )", GUIDE, re.S | re.M):
+    n = int(m.group(1))
+    if n <= len(prs.slides):
+        body = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", m.group(2))  # links → their text
+        prs.slides[n - 1].notes_slide.notes_text_frame.text = body.replace("**", "").strip()
 
 prs.save(OUT)
 print(f"{OUT} · {len(prs.slides)} slides · {OUT.stat().st_size / 1e6:.1f} MB")
