@@ -5,9 +5,10 @@ LiteRT model and works fully offline. When online it syncs diagnoses, updates it
 server for a second opinion and shows cited treatment advice, all through
 [`go-backend`](../go-backend/README.md).
 
-**Status: UI done on mock data.** Every screen and state (S1–S10) is built and covered by goldens
-(light + dark) and 91 tests. Mock adapters stand in behind the real ports; the next milestone is F1
-(on-device inference with `flutter_litert`, Hive storage), see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Status: runs end to end.** On-device LiteRT diagnosis, Hive storage, and go-backend sync, advice,
+second opinion and model updates all work on the emulator (checked 2026-11-04). Every screen also
+runs on mock data (`SCENARIO`) for design states and golden tests. Next: the Python-fixture
+preprocessing parity test, resumable downloads, secure storage for the key.
 
 ## Documents
 
@@ -40,19 +41,27 @@ Check everything with `flutter doctor -v`.
 - **Android:** minSdk 26, targetSdk 36.
 - **iOS:** 15.0 or later.
 
-## Quick start (mock data, no backend needed)
+## Quick start
+
+**End to end (real model, real backend).** Start the backend from the repo root first
+(`docker compose up -d --build --wait`, with Ollama running; see the [root README](../README.md#run-the-app-end-to-end-on-an-emulator)), then:
 
 ```bash
 cd mobile-app
 flutter pub get
-flutter run                                   # pick the emulator; default scenario: online
-flutter run --dart-define=SCENARIO=offline    # or firstRun, uncertainPhoto, adviceDown,
-                                              # updateAvailable, checksumFail, onboarding
+flutter run -d emulator-5554                  # real adapters, backend at http://10.0.2.2:8080
+flutter run --dart-define=SERVER_URL=http://192.168.1.20:8080   # real phone: your laptop's IP
 ```
 
-From F1 the real model is bundled too:
+What runs for real: on-device LiteRT (`flutter_litert`, bundled `assets/models/crop_disease_v1.*`),
+diagnoses and settings in Hive, photos from camera, gallery or the bundled samples ("Use a sample
+photo"), and go-backend over HTTP for `/ready`, sync (automatic when online), second opinion, advice
+and model updates. The access key defaults to `dev-key` (`--dart-define=API_KEY=...`).
+
+**Mock data (no backend; design states, golden tests, offline demos):**
 ```bash
-cp ../python-ml-service/models/crop_disease_v1.{tflite,json} assets/models/
+flutter run --dart-define=SCENARIO=online     # or offline, firstRun, uncertainPhoto, adviceDown,
+                                              # updateAvailable, checksumFail, syncRejected, onboarding
 ```
 
 The model files are produced by `python-ml-service/scripts/export_tflite.py` (see the

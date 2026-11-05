@@ -1,0 +1,63 @@
+{
+  // LeafCheck (mobile-app). Start the backend first for the "real backend" configs:
+  //   docker compose up -d --build --wait   (and `ollama serve`)
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "LeafCheck: real backend (emulator)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile-app",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "LeafCheck: real backend (phone on same Wi-Fi)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile-app",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define=SERVER_URL=http://${input:laptopIp}:8080"]
+    },
+    {
+      "name": "LeafCheck: mock data (pick scenario)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile-app",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define=SCENARIO=${input:scenario}"]
+    },
+    {
+      "name": "LeafCheck: real backend (profile mode)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile-app",
+      "program": "lib/main.dart",
+      "flutterMode": "profile"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "laptopIp",
+      "type": "promptString",
+      "description": "Laptop IP on the shared network (macOS: ipconfig getifaddr en0)",
+      "default": "192.168.1.20"
+    },
+    {
+      "id": "scenario",
+      "type": "pickString",
+      "description": "Mock scenario",
+      "options": [
+        "online",
+        "offline",
+        "firstRun",
+        "uncertainPhoto",
+        "adviceDown",
+        "updateAvailable",
+        "checksumFail",
+        "syncRejected",
+        "onboarding"
+      ],
+      "default": "online"
+    }
+  ]
+}

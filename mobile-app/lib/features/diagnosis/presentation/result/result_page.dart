@@ -14,6 +14,7 @@ import 'package:leafcheck/features/diagnosis/presentation/result/widgets/result_
 import 'package:leafcheck/features/diagnosis/presentation/result/widgets/result_header.dart';
 import 'package:leafcheck/features/diagnosis/presentation/strings/diagnosis_strings.dart';
 import 'package:leafcheck/features/diagnosis/presentation/widgets/diagnosis_presenter.dart';
+import 'package:leafcheck/ui/assets/app_assets.dart';
 import 'package:leafcheck/ui/strings/common_strings.dart';
 import 'package:leafcheck/ui/theme/app_icons.dart';
 import 'package:leafcheck/ui/theme/tokens.dart';
@@ -109,7 +110,7 @@ class ResultPage extends ConsumerWidget {
                   const SizedBox(height: AppSpace.lg),
                 ],
                 LeafPhoto(
-                  image: AssetImage(d.imagePath),
+                  image: AppAssets.photo(d.imagePath),
                   heroTag: LeafPhoto.scanHeroTag,
                   height: d.secondOpinion == null ? 240 : 120,
                   width: double.infinity,

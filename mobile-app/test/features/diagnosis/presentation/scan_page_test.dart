@@ -68,7 +68,7 @@ void main() {
       find.byType(MaterialApp),
       matchesGoldenFile(goldenFile('s1a_a_photo_source')),
     );
-    await t.tap(find.text('Take photo'));
+    await t.tap(find.text('Use a sample photo'));
     await t.pumpAndSettle();
     expect(find.text('Choose a sample photo'), findsOneWidget);
   });

@@ -23,7 +23,7 @@ with links you can share with the audience. Outline and sources for every number
 
 ## What is real today (say it before anyone asks)
 
-| Real, measured | Mock (behind the real ports) |
+| Real, measured | Mock (behind the real portsGi) |
 |---|---|
 | Trained model, eval and field numbers (`ml-training/outputs/`) | In-app inference: LiteRT arrives in **F1** |
 | `.tflite` export + laptop benchmark 1.9 ms (`benchmarks/results.md` D2) | Local storage (Hive) and sync: **F1/F2** |

@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:leafcheck/app/di/providers.dart';
 import 'package:leafcheck/app/router/app_router.dart';
 import 'package:leafcheck/app/router/routes.dart';
 import 'package:leafcheck/features/settings/domain/settings.dart';
 import 'package:leafcheck/features/settings/presentation/settings/app_settings_controller.dart';
+import 'package:leafcheck/features/settings/presentation/shared/backend_status_provider.dart';
 import 'package:leafcheck/ui/strings/common_strings.dart';
 import 'package:leafcheck/ui/theme/app_theme.dart';
 import 'package:leafcheck/ui/theme/motion.dart';
@@ -32,6 +36,15 @@ class _AppState extends ConsumerState<App> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsProvider);
+    // Real backend: upload the outbox whenever /ready says we are online
+    // (no-op when nothing is pending). Mock scenarios keep their fixed states.
+    if (ref.watch(scenarioProvider) == null) {
+      ref.listen(backendStatusProvider, (_, next) {
+        if (next.value?.online ?? false) {
+          unawaited(ref.read(syncDiagnosesProvider)());
+        }
+      });
+    }
     return MaterialApp.router(
       title: CommonStrings.appName,
       debugShowCheckedModeBanner: false,

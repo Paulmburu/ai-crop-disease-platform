@@ -36,7 +36,7 @@ void main() {
     await pumpApp(t);
     await t.tap(find.text('Scan a leaf'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Take photo'));
+    await t.tap(find.text('Use a sample photo'));
     await t.pumpAndSettle();
     await t.tap(find.bySemanticsLabel('leaf_late_blight.jpg'));
     await t.pump();

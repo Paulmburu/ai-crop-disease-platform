@@ -8,6 +8,7 @@ import 'package:leafcheck/features/diagnosis/presentation/analyzing/analyzing_co
 import 'package:leafcheck/features/diagnosis/presentation/analyzing/widgets/analyzing_caption.dart';
 import 'package:leafcheck/features/diagnosis/presentation/analyzing/widgets/scan_line_overlay.dart';
 import 'package:leafcheck/features/diagnosis/presentation/strings/diagnosis_strings.dart';
+import 'package:leafcheck/ui/assets/app_assets.dart';
 import 'package:leafcheck/ui/strings/common_strings.dart';
 import 'package:leafcheck/ui/theme/app_icons.dart';
 import 'package:leafcheck/ui/theme/tokens.dart';
@@ -57,7 +58,7 @@ class AnalyzingPage extends ConsumerWidget {
               fit: StackFit.expand,
               children: [
                 LeafPhoto(
-                  image: AssetImage(imagePath),
+                  image: AppAssets.photo(imagePath),
                   heroTag: LeafPhoto.scanHeroTag,
                 ),
                 if (!failed)
