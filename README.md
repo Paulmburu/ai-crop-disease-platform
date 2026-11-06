@@ -323,6 +323,8 @@ Every service reads environment variables. See each `.env.example` and README fo
 |---|---|
 | [`docs/ai_ml_roadmap_2026.md`](docs/ai_ml_roadmap_2026.md) | The overall learning roadmap |
 | [`docs/PHASE_0_PYTHON_FLUENCY.md`](docs/PHASE_0_PYTHON_FLUENCY.md) | Python refresher |
+| [`docs/learn/`](docs/learn/README.md) | Beginner walkthroughs, one per part (ML training first) |
+| [`docs/ARCHITECTURE_FLOW.md`](docs/ARCHITECTURE_FLOW.md) | Training → ML service → RAG → go-backend → Flutter: diagrams and the files involved at each step |
 | [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) | **Start here:** beginner's guide with diagrams (MobileNetV2, the 50% threshold, Ollama/RAG, sync) |
 | [`docs/PHASE_1_ML_THEORY_AND_DATA.md`](docs/PHASE_1_ML_THEORY_AND_DATA.md) | ML theory, data, training (`ml-training/`) |
 | [`docs/PHASE_2_PYTHON_ML_SERVICE.md`](docs/PHASE_2_PYTHON_ML_SERVICE.md) | Inference service (`python-ml-service/`) |
