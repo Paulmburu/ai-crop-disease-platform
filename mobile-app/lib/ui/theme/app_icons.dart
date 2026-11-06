@@ -35,6 +35,7 @@ abstract final class AppIcons {
   // Content
   static const IconData camera = Icons.photo_camera_outlined;
   static const IconData gallery = Icons.photo_library_outlined;
+  static const IconData sample = Icons.eco_outlined;
   static const IconData advice = Icons.chat_outlined;
   static const IconData send = Icons.send;
   static const IconData delete = Icons.delete_outline;

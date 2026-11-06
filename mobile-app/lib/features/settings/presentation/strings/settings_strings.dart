@@ -23,6 +23,7 @@ abstract final class SettingsStrings {
   static const version = 'Version';
   static const appVersion = '1.0.0 (1)';
   static const mockScenario = 'Mock scenario';
+  static const realBackend = 'Off · real backend';
   static const restartToApply =
       'Restart the app with this scenario: '
       'flutter run --dart-define=SCENARIO=';

@@ -5,6 +5,7 @@ import 'package:leafcheck/features/diagnosis/domain/enums/diagnosis_enums.dart';
 import 'package:leafcheck/features/diagnosis/presentation/strings/diagnosis_strings.dart';
 import 'package:leafcheck/features/diagnosis/presentation/widgets/diagnosis_presenter.dart';
 import 'package:leafcheck/features/diagnosis/presentation/widgets/sync_chip.dart';
+import 'package:leafcheck/ui/assets/app_assets.dart';
 import 'package:leafcheck/ui/strings/common_strings.dart';
 import 'package:leafcheck/ui/theme/tokens.dart';
 import 'package:leafcheck/ui/theme/typography.dart';
@@ -49,7 +50,7 @@ class DiagnosisTile extends StatelessWidget {
           child: Row(
             children: [
               LeafPhoto(
-                image: AssetImage(diagnosis.imagePath),
+                image: AppAssets.photo(diagnosis.imagePath),
                 width: AppSize.thumbnail,
                 height: AppSize.thumbnail,
                 radius: AppRadius.thumbnail,

@@ -125,7 +125,9 @@ class SettingsPage extends ConsumerWidget {
                 SettingsRow(
                   icon: AppIcons.build,
                   title: SettingsStrings.mockScenario,
-                  subtitle: ref.watch(scenarioProvider).name,
+                  subtitle:
+                      ref.watch(scenarioProvider)?.name ??
+                      SettingsStrings.realBackend,
                   onTap: () => context.push(Routes.devComponents),
                 ),
               ],

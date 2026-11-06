@@ -18,6 +18,7 @@ abstract final class DiagnosisStrings {
   static const takePhoto = 'Take photo';
   static const fromGallery = 'Choose from gallery';
   static const pickDemoPhoto = 'Choose a sample photo';
+  static const useSample = 'Use a sample photo';
 
   // Analyzing
   static const analyzing = 'Checking the leaf…';

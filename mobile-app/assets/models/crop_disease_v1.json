@@ -1,0 +1,21 @@
+{
+  "model_version": "v1",
+  "input_shape": [
+    1,
+    224,
+    224,
+    3
+  ],
+  "input_layout": "NHWC",
+  "input_range": [
+    0,
+    1
+  ],
+  "output": "probabilities",
+  "class_names": [
+    "Potato___Early_blight",
+    "Potato___Late_blight",
+    "Potato___healthy"
+  ],
+  "confidence_threshold": 0.5
+}

@@ -27,6 +27,7 @@ crop is **potato**, with three classes: early blight, late blight and healthy.
     - [3. Start Ollama](#3-start-ollama)
     - [4. Run the stack](#4-run-the-stack)
   - [Try the API](#try-the-api)
+  - [Run the app end to end on an emulator](#run-the-app-end-to-end-on-an-emulator)
   - [Use from a phone](#use-from-a-phone)
   - [Running services without Docker](#running-services-without-docker)
   - [Tests](#tests)
@@ -212,6 +213,25 @@ Errors always have the same shape on every service:
 `{"error": "advice_unavailable", "detail": "...", "request_id": "..."}`. Send `X-Request-ID` to trace one
 call across services.
 
+## Run the app end to end on an emulator
+
+1. Start Ollama (`ollama serve`; `ollama list` shows `llama3.1:8b`) and the stack:
+   `docker compose up -d --build --wait`, then check `curl localhost:8080/ready` →
+   `"ml_service": true, "rag_service": true`.
+2. Start an Android emulator (`flutter emulators --launch <id>`).
+3. Run the app with the real adapters:
+   ```bash
+   cd mobile-app && flutter pub get && flutter run -d emulator-5554
+   ```
+   The emulator reaches the laptop at `http://10.0.2.2:8080` (the default `SERVER_URL`).
+4. Try it: Scan a leaf → **Use a sample photo** → result in milliseconds on the phone → **Ask the
+   server for a second opinion** → **Get advice** (cited answer; the first call warms the LLM) →
+   History shows **Synced** within ~10 s. Turn on airplane mode in the emulator, scan again: the
+   result still appears and waits as **Pending** until the network is back.
+
+Without `SCENARIO` the app uses the real adapters; `--dart-define=SCENARIO=offline` (etc.) runs it on
+mock data with no backend. Details: [`mobile-app/README.md`](mobile-app/README.md).
+
 ## Use from a phone
 
 | Where the app runs | Base URL |
@@ -303,6 +323,9 @@ Every service reads environment variables. See each `.env.example` and README fo
 |---|---|
 | [`docs/ai_ml_roadmap_2026.md`](docs/ai_ml_roadmap_2026.md) | The overall learning roadmap |
 | [`docs/PHASE_0_PYTHON_FLUENCY.md`](docs/PHASE_0_PYTHON_FLUENCY.md) | Python refresher |
+| [`docs/learn/`](docs/learn/README.md) | Beginner walkthroughs, one per part (ML training first) |
+| [`docs/ARCHITECTURE_FLOW.md`](docs/ARCHITECTURE_FLOW.md) | Training → ML service → RAG → go-backend → Flutter: diagrams and the files involved at each step |
+| [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md) | **Start here:** beginner's guide with diagrams (MobileNetV2, the 50% threshold, Ollama/RAG, sync) |
 | [`docs/PHASE_1_ML_THEORY_AND_DATA.md`](docs/PHASE_1_ML_THEORY_AND_DATA.md) | ML theory, data, training (`ml-training/`) |
 | [`docs/PHASE_2_PYTHON_ML_SERVICE.md`](docs/PHASE_2_PYTHON_ML_SERVICE.md) | Inference service (`python-ml-service/`) |
 | [`docs/PHASE_3_RAG_PIPELINE.md`](docs/PHASE_3_RAG_PIPELINE.md) | RAG pipeline (`rag-service/`) |
@@ -329,6 +352,6 @@ Every service reads environment variables. See each `.env.example` and README fo
 | Phase 4 go-backend M0–M3 (sync, history, model releases, gateway) | ✅ done |
 | Benchmarks | ✅ done |
 | go-backend M4 hardening (rate limits, metrics, OpenAPI), CI | ⏳ after the talk |
-| Flutter app (Phase 6): UI on mock data, 91 tests, goldens | ✅ done |
-| Flutter app F1–F2: on-device LiteRT, Hive, real sync | ⏳ next |
+| Flutter app (Phase 6): all screens, goldens, mock scenarios | ✅ done |
+| Flutter app end to end: on-device LiteRT, Hive, sync, advice, second opinion, model updates | ✅ done |
 | Talk deck + speaker guide | ✅ done |

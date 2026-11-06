@@ -22,7 +22,8 @@ Never _unbound(String port) =>
     throw UnimplementedError('$port is not bound; see mock_overrides.dart');
 
 // ── Environment ──────────────────────────────────────────────────────────
-final scenarioProvider = Provider<MockScenario>((_) => MockScenario.online);
+/// The mock scenario, or null when the app runs on the real adapters.
+final scenarioProvider = Provider<MockScenario?>((_) => null);
 final clockProvider = Provider<Clock>((_) => systemClock);
 final idGeneratorProvider = Provider<String Function()>(
   // ponytail: time-based ids for mock data; real UUID v4 (package uuid) in F1.
